@@ -1,0 +1,28 @@
+<svg width="256" height="256" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Grow A Garden">
+  <rect x="0.8" y="0.8" width="38.4" height="38.4" rx="10" fill="url(#g-tile)" stroke="rgba(255,255,255,0.10)" stroke-width="1"></rect>
+  <ellipse cx="20" cy="26.8" rx="11.5" ry="5.6" fill="url(#g-soil)"></ellipse>
+  <g transform="translate(20,10)">
+    <path d="M0 5 C0 10 0 15 0 21" stroke="url(#g-stem)" stroke-width="2.6" stroke-linecap="round"></path>
+    <path d="M0 10 C-6 9 -9 6 -10.5 2.5 C-5.5 2 -2 3.5 0 6 Z" fill="url(#g-leaf)"></path>
+    <path d="M0 10 C6 9 9 6 10.5 2.5 C5.5 2 2 3.5 0 6 Z" fill="url(#g-leaf)"></path>
+  </g>
+  <defs>
+    <linearGradient id="g-tile" x1="0" y1="0" x2="0" y2="40">
+      <stop offset="0" stop-color="#1E8A4D"></stop>
+      <stop offset=".55" stop-color="#15653A"></stop>
+      <stop offset="1" stop-color="#0F2A19"></stop>
+    </linearGradient>
+    <linearGradient id="g-soil" x1="8" y1="22" x2="28" y2="32">
+      <stop offset="0" stop-color="#1B3A2A"></stop>
+      <stop offset="1" stop-color="#10261C"></stop>
+    </linearGradient>
+    <linearGradient id="g-stem" x1="0" y1="5" x2="0" y2="22">
+      <stop offset="0" stop-color="#71FF9A"></stop>
+      <stop offset="1" stop-color="#2FE689"></stop>
+    </linearGradient>
+    <linearGradient id="g-leaf" x1="-8" y1="2" x2="8" y2="12">
+      <stop offset="0" stop-color="#9FFFC2"></stop>
+      <stop offset="1" stop-color="#36D67F"></stop>
+    </linearGradient>
+  </defs>
+</svg>

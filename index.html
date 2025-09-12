@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Grow A Garden Calculator • Pro</title>
+  <meta name="description" content="Plan your crops smarter. Instantly calculate Grow A Garden values with precise mutation multipliers, weight factors, and friend boosts." />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+
+  <!-- Minimal overrides to match competitor’s “one main card with inner sections” 
+       and to show visible checkboxes in Environmental Mutations -->
+  <style>
+    /* Wrapper card stays the same look; inner panels get subtle slabs */
+    .calc-block { padding: 22px; }
+    .calc-block .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .calc-block .panel h2,
+    .calc-block .panel h3{ margin: 0 0 10px; }
+
+    /* Environmental grid with visible checkboxes + value badge on the right */
+    #envGroup.env-grid{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 10px;
+    }
+    @media (max-width: 1060px){ #envGroup.env-grid{ grid-template-columns: repeat(3,1fr); } }
+    @media (max-width: 760px){  #envGroup.env-grid{ grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 520px){  #envGroup.env-grid{ grid-template-columns: 1fr; } }
+
+    /* Don’t hide env checkboxes (global .pill rule hides inputs) */
+    #envGroup .env-pill input{ display: inline-block !important; }
+
+    #envGroup .env-pill{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: var(--pill);
+      border: 1px solid rgba(255,255,255,.08);
+      cursor: pointer;
+      user-select: none;
+      transition: transform .12s ease, box-shadow .12s ease, outline-color .12s ease;
+    }
+    #envGroup .env-pill:hover{ transform: translateY(-1px); box-shadow: 0 10px 20px rgba(0,0,0,.25); }
+    #envGroup .env-pill input[type="checkbox"]{
+      appearance: checkbox;
+      accent-color: var(--ring);
+      width: 16px; height: 16px;
+      margin: 0;
+    }
+    #envGroup .env-name{ font-weight: 700; }
+    #envGroup .mut{
+      margin-left: auto;
+      font-weight: 800;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(113,255,154,.12);
+      border: 1px solid rgba(113,255,154,.28);
+      color: var(--accent-2);
+    }
+    /* Checked state ring */
+    #envGroup .env-pill:has(input:checked){
+      outline: 3px solid rgba(9, 205, 64, 0.749);
+      background: rgba(255,255,255,.06);
+    }
+  </style>
+</head>
+
+<body class="has-fixed-header">
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="index.html" aria-label="Grow A Garden Calculator">
+        <img class="brand-logo" src="assets/img/logo-green.png" alt="Grow A Garden Calculator logo" />
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a class="active" href="index.html" aria-current="page">Home</a>
+        <a href="values.html">Values</a>
+        <a href="trade.html">Trade Calculator</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="container">
+    <!-- Crop Picker Modal -->
+    <dialog id="cropModal">
+      <form method="dialog" class="modal crop-modal" aria-labelledby="cropPickerTitle">
+        <header class="crop-modal__head">
+          <h3 id="cropPickerTitle">Select a Crop</h3>
+          <button class="icon crop-modal__close" value="close" aria-label="Close">&times;</button>
+        </header>
+        <div class="crop-modal__search">
+          <div class="input-wrap">
+            <input id="cropSearch" type="search" placeholder="Search for crops…" autocomplete="off" />
+          </div>
+        </div>
+        <div class="crop-modal__body">
+          <div id="cropList" class="crop-grid" role="list"></div>
+        </div>
+        <footer class="crop-modal__foot">
+          <button class="btn" value="close">Done</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <!-- HERO -->
+    <section class="hero">
+      <h1>Grow A Garden Calculator</h1>
+      <p>Plan your crops smarter. Instantly calculate values with precise mutation multipliers, weight factors, and friend boosts.</p>
+    </section>
+
+    <!-- === ONE MAIN CARD (like competitor) – up to Environmental Mutations === -->
+    <section class="card calc calc-block" id="calculator">
+
+      <!-- Panel 1: Crop Selection -->
+      <section class="panel" id="sec-crop">
+        <h2 class="section-title">🌱 Crop Selection</h2>
+        <div class="grid g2">
+          <!-- Keep EXACT UI -->
+          <div class="field">
+            <label for="btn-crop">Crop</label>
+            <button id="btn-crop" type="button" class="btn" aria-live="polite">
+              <span id="btnCropLabel">Select Crop</span>
+            </button>
+          </div>
+          <label class="field">
+            <span>Minimum Base Value</span>
+            <input id="baseValue" type="number" min="0" placeholder="Enter base value" />
+          </label>
+        </div>
+        <div id="chosenCrop" class="chosen-pill" hidden aria-live="polite"></div>
+      </section>
+
+      <!-- Panel 2: Growth Mutations -->
+      <section class="panel" id="sec-growth">
+        <h2 class="section-title">✨ Mutations</h2>
+        <div class="sub">
+          <h3>Growth Mutations</h3>
+          <div id="growthGroup" class="choice-row" role="radiogroup" aria-label="Growth"></div>
+        </div>
+      </section>
+
+      <!-- Panel 3: Temperature Mutations -->
+      <section class="panel" id="sec-temp">
+        <div class="sub">
+          <h3>Temperature Mutations</h3>
+          <div id="tempGroup" class="choice-row" role="radiogroup" aria-label="Temperature"></div>
+        </div>
+      </section>
+
+      <!-- Panel 4: Environmental Mutations (checkboxes visible + value badge) -->
+      <section class="panel" id="sec-env">
+        <div class="sub">
+          <h3>Environmental Mutations</h3>
+
+          <div id="envGroup" class="env-grid">
+            <!-- Row 1 -->
+            <label class="env-pill" data-key="Chocolate" data-mult="2">
+              <input class="env-check" type="checkbox" value="2"><span class="env-name">Chocolate</span><span class="mut">×2</span>
+            </label>
+            <label class="env-pill" data-key="Moonlit" data-mult="2">
+              <input class="env-check" type="checkbox" value="2"><span class="env-name">Moonlit</span><span class="mut">×2</span>
+            </label>
+            <label class="env-pill" data-key="Windstruck" data-mult="2">
+              <input class="env-check" type="checkbox" value="2"><span class="env-name">Windstruck</span><span class="mut">×2</span>
+            </label>
+            <label class="env-pill" data-key="Pollinated" data-mult="3">
+              <input class="env-check" type="checkbox" value="3"><span class="env-name">Pollinated</span><span class="mut">×3</span>
+            </label>
+
+            <!-- Row 2 -->
+            <label class="env-pill" data-key="Sandy" data-mult="3">
+              <input class="env-check" type="checkbox" value="3"><span class="env-name">Sandy</span><span class="mut">×3</span>
+            </label>
+            <label class="env-pill" data-key="Bloodlit" data-mult="4">
+              <input class="env-check" type="checkbox" value="4"><span class="env-name">Bloodlit</span><span class="mut">×4</span>
+            </label>
+            <label class="env-pill" data-key="Burnt" data-mult="4">
+              <input class="env-check" type="checkbox" value="4"><span class="env-name">Burnt</span><span class="mut">×4</span>
+            </label>
+            <label class="env-pill" data-key="Verdant" data-mult="4">
+              <input class="env-check" type="checkbox" value="4"><span class="env-name">Verdant</span><span class="mut">×4</span>
+            </label>
+
+            <!-- Row 3 -->
+            <label class="env-pill" data-key="Wiltproof" data-mult="4">
+              <input class="env-check" type="checkbox" value="4"><span class="env-name">Wiltproof</span><span class="mut">×4</span>
+            </label>
+            <label class="env-pill" data-key="Plasma" data-mult="5">
+              <input class="env-check" type="checkbox" value="5"><span class="env-name">Plasma</span><span class="mut">×5</span>
+            </label>
+            <label class="env-pill" data-key="Honey Glazed" data-mult="5">
+              <input class="env-check" type="checkbox" value="5"><span class="env-name">Honey Glazed</span><span class="mut">×5</span>
+            </label>
+            <label class="env-pill" data-key="Heavenly" data-mult="5">
+              <input class="env-check" type="checkbox" value="5"><span class="env-name">Heavenly</span><span class="mut">×5</span>
+            </label>
+
+            <!-- Row 4 -->
+            <label class="env-pill" data-key="Twisted" data-mult="5">
+              <input class="env-check" type="checkbox" value="5"><span class="env-name">Twisted</span><span class="mut">×5</span>
+            </label>
+            <label class="env-pill" data-key="Cloudtouched" data-mult="5">
+              <input class="env-check" type="checkbox" value="5"><span class="env-name">Cloudtouched</span><span class="mut">×5</span>
+            </label>
+            <label class="env-pill" data-key="Clay" data-mult="5">
+              <input class="env-check" type="checkbox" value="5"><span class="env-name">Clay</span><span class="mut">×5</span>
+            </label>
+            <label class="env-pill" data-key="Fried" data-mult="8">
+              <input class="env-check" type="checkbox" value="8"><span class="env-name">Fried</span><span class="mut">×8</span>
+            </label>
+
+            <!-- Row 5 -->
+            <label class="env-pill" data-key="Cooked" data-mult="10">
+              <input class="env-check" type="checkbox" value="10"><span class="env-name">Cooked</span><span class="mut">×10</span>
+            </label>
+            <label class="env-pill" data-key="Amber" data-mult="10">
+              <input class="env-check" type="checkbox" value="10"><span class="env-name">Amber</span><span class="mut">×10</span>
+            </label>
+            <label class="env-pill" data-key="Tempestuous" data-mult="12">
+              <input class="env-check" type="checkbox" value="12"><span class="env-name">Tempestuous</span><span class="mut">×12</span>
+            </label>
+            <label class="env-pill" data-key="OldAmber" data-mult="20">
+              <input class="env-check" type="checkbox" value="20"><span class="env-name">OldAmber</span><span class="mut">×20</span>
+            </label>
+
+            <!-- Row 6 -->
+            <label class="env-pill" data-key="Zombified" data-mult="25">
+              <input class="env-check" type="checkbox" value="25"><span class="env-name">Zombified</span><span class="mut">×25</span>
+            </label>
+            <label class="env-pill" data-key="Molten" data-mult="25">
+              <input class="env-check" type="checkbox" value="25"><span class="env-name">Molten</span><span class="mut">×25</span>
+            </label>
+            <label class="env-pill" data-key="Ceramic" data-mult="30">
+              <input class="env-check" type="checkbox" value="30"><span class="env-name">Ceramic</span><span class="mut">×30</span>
+            </label>
+            <label class="env-pill" data-key="AncientAmber" data-mult="50">
+              <input class="env-check" type="checkbox" value="50"><span class="env-name">AncientAmber</span><span class="mut">×50</span>
+            </label>
+
+            <!-- Row 7 -->
+            <label class="env-pill" data-key="Friendbound" data-mult="70">
+              <input class="env-check" type="checkbox" value="70"><span class="env-name">Friendbound</span><span class="mut">×70</span>
+            </label>
+            <label class="env-pill" data-key="Infected" data-mult="75">
+              <input class="env-check" type="checkbox" value="75"><span class="env-name">Infected</span><span class="mut">×75</span>
+            </label>
+            <label class="env-pill" data-key="Sundried" data-mult="85">
+              <input class="env-check" type="checkbox" value="85"><span class="env-name">Sundried</span><span class="mut">×85</span>
+            </label>
+            <label class="env-pill" data-key="Aurora" data-mult="90">
+              <input class="env-check" type="checkbox" value="90"><span class="env-name">Aurora</span><span class="mut">×90</span>
+            </label>
+
+            <!-- Row 8 -->
+            <label class="env-pill" data-key="Shocked" data-mult="100">
+              <input class="env-check" type="checkbox" value="100"><span class="env-name">Shocked</span><span class="mut">×100</span>
+            </label>
+            <label class="env-pill" data-key="Paradisal" data-mult="100">
+              <input class="env-check" type="checkbox" value="100"><span class="env-name">Paradisal</span><span class="mut">×100</span>
+            </label>
+            <label class="env-pill" data-key="Alienlike" data-mult="100">
+              <input class="env-check" type="checkbox" value="100"><span class="env-name">Alienlike</span><span class="mut">×100</span>
+            </label>
+            <label class="env-pill" data-key="Celestial" data-mult="120">
+              <input class="env-check" type="checkbox" value="120"><span class="env-name">Celestial</span><span class="mut">×120</span>
+            </label>
+
+            <!-- Row 9 -->
+            <label class="env-pill" data-key="Galactic" data-mult="120">
+              <input class="env-check" type="checkbox" value="120"><span class="env-name">Galactic</span><span class="mut">×120</span>
+            </label>
+            <label class="env-pill" data-key="Disco" data-mult="125">
+              <input class="env-check" type="checkbox" value="125"><span class="env-name">Disco</span><span class="mut">×125</span>
+            </label>
+            <label class="env-pill" data-key="Meteoric" data-mult="125">
+              <input class="env-check" type="checkbox" value="125"><span class="env-name">Meteoric</span><span class="mut">×125</span>
+            </label>
+            <label class="env-pill" data-key="Voidtouched" data-mult="135">
+              <input class="env-check" type="checkbox" value="135"><span class="env-name">Voidtouched</span><span class="mut">×135</span>
+            </label>
+
+            <!-- Row 10 -->
+            <label class="env-pill" data-key="Dawnbound" data-mult="150">
+              <input class="env-check" type="checkbox" value="150"><span class="env-name">Dawnbound</span><span class="mut">×150</span>
+            </label>
+            <label class="env-pill" data-key="Toxic" data-mult="12">
+              <input class="env-check" type="checkbox" value="12"><span class="env-name">Toxic</span><span class="mut">×12</span>
+            </label>
+            <label class="env-pill" data-key="Chakra" data-mult="15">
+              <input class="env-check" type="checkbox" value="15"><span class="env-name">Chakra</span><span class="mut">×15</span>
+            </label>
+            <label class="env-pill" data-key="Tranquil" data-mult="20">
+              <input class="env-check" type="checkbox" value="20"><span class="env-name">Tranquil</span><span class="mut">×20</span>
+            </label>
+
+            <!-- Row 11 -->
+            <label class="env-pill" data-key="Radioactive" data-mult="80">
+              <input class="env-check" type="checkbox" value="80"><span class="env-name">Radioactive</span><span class="mut">×80</span>
+            </label>
+            <label class="env-pill" data-key="Foxfire" data-mult="90">
+              <input class="env-check" type="checkbox" value="90"><span class="env-name">Foxfire</span><span class="mut">×90</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- (Stop here per your request; next panels like controls/result come after this) -->
+    </section>
+      <!-- CONTROLS (competitor-style panel) -->
+      <section class="controls-panel">
+        <div class="controls-grid">
+          <label class="field">
+            <span>Input Weight</span>
+            <input id="weight" type="number" min="0" step="0.01" placeholder="e.g. 1.2" />
+          </label>
+
+          <label class="field">
+            <span>Quantity</span>
+            <input id="qty" type="number" min="1" value="1" />
+          </label>
+
+          <label class="field slider-wrap">
+            <span>Friend Boost (<b id="friendPct">0%</b>)</span>
+            <input id="friend" type="range" min="0" max="50" step="1" value="0" />
+          </label>
+
+          <label class="switch switch-inline" title="Apply maximum possible mutation bonus">
+            <input id="maxMutation" type="checkbox" />
+            <span>Max Mutation</span>
+          </label>
+        </div>
+     
+
+      <!-- OUTPUT -->
+      <div class="section result">
+        <h2>Calculated Minimum Value</h2>
+        <div class="big-number" id="result">0</div>
+
+        <p class="notice">⚠️ <strong>Note:</strong> This is the minimum value of your plant(s). The actual value depends on the plant size, weight, and quantity.</p>
+
+        <details class="breakdown" open>
+          <summary>Calculation Breakdown</summary>
+          <ul id="breakdownList"></ul>
+          <p class="note">This is the minimum value given your inputs. Actual in-game value may vary with plant size/weight and market trades.</p>
+        </details>
+      </div>
+     </section>
+
+ <!-- CONTENT (same order as competitor, rewritten copy) -->
+<!-- CONTENT (same order as competitor, rewritten copy) -->
+<section class="section-block kb">
+  <h2>How to Use the Grow A Garden Calculator</h2>
+  <p class="lead">Our calculator is built for speed and accuracy. Follow these simple steps to calculate crop values with confidence:</p>
+
+  <h3>Step 1: Select Your Crop</h3>
+  <p>Start by selecting a crop (e.g., Apple, Blueberry, Potato). Its base value will appear instantly.</p>
+
+  <h3>Step 2: Apply Mutations</h3>
+  <p>Enable any applicable Growth, Temperature, or Environmental mutations. The calculator automatically combines their multipliers for precise results.</p>
+  <ul>
+    <li>Shocked</li>
+    <li>Golden</li>
+    <li>Celestial</li>
+    <li>…and more</li>
+  </ul>
+
+  <h3>Step 3: Add Boosts</h3>
+  <ul>
+    <li>Friend boost</li>
+    <li>Double-sell events (apply through base if relevant)</li>
+    <li>Weight multiplier</li>
+  </ul>
+
+  <h3>Step 4: Review the Final Value</h3>
+  <ul>
+    <li>Total crop value shown in Sheckles</li>
+    <li>All active multipliers displayed</li>
+    <li>Formula breakdown for full transparency</li>
+  </ul>
+
+  <br>
+
+  <!-- Trade value content INLINE (no new section wrapper) -->
+  <h2>Trade Value Calculator — Win, Fair, or Lose</h2>
+  <p>
+    Use the <strong>Win/Fair/Lose Analyzer</strong> to assess your Grow A Garden trades before confirming them.
+  </p>
+  <ul>
+    <li>Select the crops you’re offering and the ones you want in return.</li>
+    <li>Add the correct mutations and active boosts on both sides.</li>
+    <li>The calculator compares values and clearly shows whether the trade is a <strong>Win</strong>, <strong>Fair</strong>, or <strong>Loss</strong>.</li>
+  </ul>
+  <p>This ensures you avoid bad trades and make smarter, fairer deals with other players.</p>
+
+  <p>
+    <a href="trade.html"
+       style="
+         display:inline-flex;align-items:center;gap:8px;
+         padding:10px 16px;border-radius:12px;font-weight:800;text-decoration:none;
+         color:#062216;background:linear-gradient(180deg, var(--accent), #1b8c56);
+         box-shadow:inset 0 -2px 0 rgba(0,0,0,.25), 0 10px 20px rgba(33,182,107,.25);
+         border:none;
+       ">
+      Analyze Your Trades – WFL
+    </a>
+  </p>
+</section>
+
+<!-- VALUES / WHY TRUST -->
+<section class="section-block" id="values">
+  <h2>Daily-Updated, Trusted Crop Values</h2>
+  <p class="lead">
+    Our database is refreshed every day to reflect the latest 
+    <a href="values.html" style="color:#ccf0cc;">crop values</a> and live in-game market changes, 
+    so your calculations are always accurate and reliable.
+  </p>
+  <p class="lead">
+    Values are sourced from the official 
+    <a href="https://growagarden.fandom.com/" style="color:#ccf0cc;" target="_blank" rel="noopener">Grow A Garden Wiki</a> 
+    and verified community networks, including Discord groups, Telegram hubs, and trusted trading circles.
+  </p>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="section-block">
+  <div class="testimonials">
+    <!-- Card 1 -->
+    <article class="testimonial t-card">
+      <header class="t-head">
+        <span class="t-quote" aria-hidden="true">“</span>
+        <div class="t-rating t-rating--stack">
+          <span class="t-score">4.9</span>
+          <span class="t-stars" aria-label="4.9 out of 5 stars">
+            <svg viewBox="0 0 20 20" class="star"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+            <svg viewBox="0 0 20 20" class="star"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+            <svg viewBox="0 0 20 20" class="star"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+            <svg viewBox="0 0 20 20" class="star"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+            <svg viewBox="0 0 20 20" class="star star--dim"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+          </span>
+        </div>
+      </header>
+
+      <div class="t-body">
+        <p>“This tool completely removed the guesswork. I can plan every harvest with confidence and trade smarter.”</p>
+      </div>
+<br>
+      <footer class="t-foot">
+        <img class="avatar" src="assets/img/avatars/jenna.png" alt="Jenna P.">
+        <div class="who">
+          <strong>Jenna P.</strong>
+          <small>Grow A Garden player</small>
+        </div>
+      </footer>
+    </article>
+    <!-- Card 2 -->
+    <article class="testimonial t-card">
+      <header class="t-head">
+        <span class="t-quote" aria-hidden="true">“</span>
+        <div class="t-rating t-rating--stack">
+          <span class="t-score">5.0</span>
+          <span class="t-stars" aria-label="5 out of 5 stars">
+            <svg viewBox="0 0 20 20" class="star"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+            <svg viewBox="0 0 20 20" class="star"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+            <svg viewBox="0 0 20 20" class="star"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+            <svg viewBox="0 0 20 20" class="star"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+            <svg viewBox="0 0 20 20" class="star"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.8 4.8 17.8l1-5.9-4.3-4.2 5.9-.9L10 1.5z"/></svg>
+          </span>
+        </div>
+      </header>
+
+      <div class="t-body">
+        <p>“Fast, accurate, and super clean UI. Values are always current — hands down the best Grow a Garden calculator.”</p>
+      </div>
+
+      <footer class="t-foot">
+        <img class="avatar" src="assets/img/avatars/sam.png" alt="Sam Kod">
+        <div class="who">
+          <strong>Sam Kod</strong>
+          <small>Trader & community mod</small>
+        </div>
+      </footer>
+    </article>
+  </div>
+</section>
+ <section class="faq-slab">
+      <div class="container">
+        <section class="faq">
+          <h2>Frequently Asked Questions</h2>
+          <div class="faq-list">
+            <details class="item">
+              <summary>1. What is the Grow A Garden Calculator?</summary>
+              <div class="answer">A smart tool for players to calculate crop values precisely using mutations, boosts, and weight.</div>
+            </details>
+            <details class="item">
+              <summary>2. How do I use the calculator?</summary>
+              <div class="answer">Select a crop, apply mutations, adjust weight/boosts, and the final value appears instantly with a full formula breakdown.</div>
+            </details>
+            <details class="item">
+              <summary>3. Can I calculate values for mutated crops?</summary>
+              <div class="answer">Yes. Growth, Temperature, and Environmental mutations are supported and stack correctly.</div>
+            </details>
+            <details class="item">
+              <summary>4. Is the calculator updated regularly?</summary>
+              <div class="answer">Yes — our values sync daily with trusted sources.</div>
+            </details>
+            <details class="item">
+              <summary>5. What is the Trade Calculator?</summary>
+              <div class="answer">A Win/Fair/Lose tool that compares two sides of a trade to help you avoid bad deals.</div>
+            </details>
+            <details class="item">
+              <summary>6. Does it work on mobile?</summary>
+              <div class="answer">Absolutely. The layout is responsive for phones and tablets.</div>
+            </details>
+            <details class="item">
+              <summary>7. Do I need to download anything?</summary>
+              <div class="answer">No — it runs entirely in your browser.</div>
+            </details>
+            <details class="item">
+              <summary>8. Is it safe to use?</summary>
+              <div class="answer">Yes. No login, no personal data — just calculations.</div>
+            </details>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="footer-accent">© 2025 Grow A Garden Calculator</div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

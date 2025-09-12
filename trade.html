@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Grow A Garden • Trade Calculator</title>
+  <meta name="description" content="Trade calculator for Grow A Garden Roblox. Compare buy price and sell value across both sides and see a fairness analysis." />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="stylesheet" href="assets/css/trade.css" />
+
+  <!-- Inline polish just for this page (colored stepper pills, small tweaks) -->
+  <style>
+    /* === SLOT / ITEM polish (kept your colors) ============================= */
+    .slot-filled .thumb { margin-top:14px; }
+    .slot-filled .name { font-weight:700; margin:6px 0 6px; }
+
+    /* === STEPPER (COMPETITOR LOOK) ======================================== */
+    .slot-filled .stepper{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:4px 10px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:999px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    /* central qty = little white pill */
+    .slot-filled .stepper .qty{
+      min-width:22px; height:22px;
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:0 6px; border-radius:999px;
+      background:#ffffff;
+      color:#0b1f16;
+      font-weight:800; line-height:1; font-size:13px;
+    }
+
+    /* – / + round buttons (blue minus, green plus) */
+    .slot-filled .stepper .minus,
+    .slot-filled .stepper .plus{
+      width:24px; height:24px; border-radius:999px;
+      display:inline-flex; align-items:center; justify-content:center;
+      font-weight:900; font-size:16px; line-height:1; color:#fff;
+      border:1.5px solid transparent;
+      box-shadow: inset 0 -2px 0 rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.25);
+      cursor:pointer; user-select:none;
+      transform: translateZ(0);
+      font-variant-ligatures: none; /* keep symbols centered */
+    }
+    .slot-filled .stepper .minus{
+      background: linear-gradient(180deg,#5b8dff,#3b6bf6);
+      border-color:#80a2ff;
+    }
+    .slot-filled .stepper .plus{
+      background: linear-gradient(180deg,#36d98a,#1eb569);
+      border-color:#67e1aa;
+    }
+    .slot-filled .stepper .minus:active,
+    .slot-filled .stepper .plus:active{ transform: translateY(1px); }
+
+    /* totals cards—only typography tweak so numbers pop */
+    .total-card .value{ font-size:22px; font-weight:800; letter-spacing:.2px; }
+  </style>
+</head>
+<body class="has-fixed-header">
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="index.html" aria-label="Grow A Garden Calculator">
+        <img class="brand-logo" src="assets/img/logo-green.png" alt="Grow A Garden Calculator logo" />
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="values.html">Values</a>
+        <a class="active" href="trade.html" aria-current="page">Trade Calculator</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="container trade-container">
+    <section class="trade-hero">
+      <h1>Grow A Garden Trade Calculator</h1>
+      <p>Calculate Trade for Grow A Garden Roblox Game</p>
+      <small class="muted">(Values updated daily)</small>
+    </section>
+
+    <section class="boards">
+      <!-- YOUR SIDE -->
+      <div class="trade-board" data-side="yours">
+        <header class="board-title">Your Items</header>
+        <div class="slots" id="yourGrid">
+          <!-- 4 slots created by JS -->
+        </div>
+        <footer class="totals">
+          <div class="total-card">
+            <div class="label">Buy Price</div>
+            <div class="value" id="yourBuyTotal">0</div>
+          </div>
+          <div class="total-card">
+            <div class="label">Sell Value</div>
+            <div class="value" id="yourSellTotal">0</div>
+          </div>
+        </footer>
+      </div>
+
+      <!-- THEIR SIDE -->
+      <div class="trade-board" data-side="theirs">
+        <header class="board-title">Their Items</header>
+        <div class="slots" id="theirGrid">
+          <!-- 4 slots created by JS -->
+        </div>
+        <footer class="totals">
+          <div class="total-card">
+            <div class="label">Buy Price</div>
+            <div class="value" id="theirBuyTotal">0</div>
+          </div>
+          <div class="total-card">
+            <div class="label">Sell Value</div>
+            <div class="value" id="theirSellTotal">0</div>
+          </div>
+        </footer>
+      </div>
+    </section>
+
+    <!-- Analysis -->
+    <section class="analysis card">
+      <div class="row">
+        <div class="a-label">Buy Price Trade Analysis</div>
+        <div class="a-status" id="buyVerdict">Fair Trade (0.0%)</div>
+      </div>
+      <div class="bar"><span id="buyBar" style="width:50%"></span></div>
+
+      <div class="row mt">
+        <div class="a-label">Sell Value Trade Analysis</div>
+        <div class="a-status" id="sellVerdict">Fair Trade (0.0%)</div>
+      </div>
+      <div class="bar"><span id="sellBar" style="width:50%"></span></div>
+    </section>
+  </main>
+
+  <!-- Crop Picker Modal (competitor-style; shares styles with index modal) -->
+  <dialog id="tradeCropModal">
+    <form method="dialog" class="modal crop-modal" aria-labelledby="tradePickerTitle">
+      <header class="crop-modal__head">
+        <h3 id="tradePickerTitle">Select a Crop</h3>
+        <button class="icon crop-modal__close" value="close" aria-label="Close">&times;</button>
+      </header>
+
+      <div class="crop-modal__search">
+        <div class="input-wrap">
+          <input id="tradeCropSearch" type="search" placeholder="Search crops…" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="crop-modal__body">
+        <div id="tradeCropList" class="crop-grid" role="list"></div>
+      </div>
+
+      <footer class="crop-modal__foot">
+        <button class="btn" value="close">Done</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- FOOTER (links + accent) -->
+  <footer class="footer-links" style="text-align:center; padding:18px 0 8px; color:#fff;">
+    <div class="wrap" style="max-width:980px">
+      <a href="index.html#mutations" style="color:#fff; text-decoration:underline;">Grow A Garden Mutation Calculator</a>
+      <span style="color:#fff;"> – </span>
+      <a href="trade.html" style="color:#fff; text-decoration:underline;">Grow A Garden Trade Calculator</a>
+      <span style="color:#fff;"> – </span>
+      <a href="values.html" style="color:#fff; text-decoration:underline;">Grow A Garden Values</a>
+    </div>
+  </footer>
+  <div class="footer-accent" style="color:#fff;">
+    © 2025 Grow A Garden Calculator
+  </div>
+
+  <!-- JS (DATA first, then pricing map, then Trade logic) -->
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/trade-prices.js"></script>
+  <script src="assets/js/trade.js"></script>
+</body>
+</html>

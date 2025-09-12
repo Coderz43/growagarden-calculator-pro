@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Grow A Garden • Values</title>
+  <meta name="description" content="Grow A Garden Values – Search, filter, and explore accurate buy/sell prices and demand for every crop." />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <!-- values.css is optional; styles are also appended by values.js helpers -->
+  <link rel="stylesheet" href="assets/css/values.css" />
+</head>
+<body class="has-fixed-header">
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="index.html" aria-label="Grow A Garden Calculator">
+        <img class="brand-logo" src="assets/img/logo-green.png" alt="Grow A Garden Calculator logo" />
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a class="active" href="values.html" aria-current="page">Values</a>
+        <a href="trade.html">Trade Calculator</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="container values-container" id="main">
+    <section class="values-hero">
+      <h1 class="page-title">Grow A Garden Values</h1>
+    </section>
+<!-- Filters -->
+<section class="filters card" aria-label="Filters">
+
+  <!-- Search + Sort -->
+  <div class="filter-row filter-top">
+    <div class="search-wrap">
+      <span class="search-ico" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+          <path d="M20 20L16.65 16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <input type="search" id="valueSearch" placeholder="Search crops…" autocomplete="off" aria-label="Search crops" />
+    </div>
+
+    <div class="sort-wrap">
+      <select id="sortSelect" aria-label="Sort results" >
+        <option value="name" >Name</option>
+        <option value="sell_desc">Sell Value (High to Low)</option>
+        <option value="sell_asc">Sell Value (Low to High)</option>
+        <option value="buy_desc">Buy Value (High to Low)</option>
+        <option value="buy_asc">Buy Value (Low to High)</option>
+        <option value="demand_desc">Demand</option>
+      </select>
+      <span class="sort-caret" aria-hidden="true">▾</span>
+    </div>
+  </div>
+
+  <!-- Full-width Reset (own row) -->
+  <button id="resetFilters" class="reset-bar" type="button">Reset</button>
+
+  <!-- Type -->
+  <div class="filter-row pills-row" role="group" aria-label="Type">
+    <span class="label">Type:</span>
+    <button class="pill active" data-type="all"     type="button">All</button>
+    <button class="pill"         data-type="regular" type="button">Regular</button>
+    <button class="pill"         data-type="limited" type="button">Limited</button>
+  </div>
+
+  <!-- Rarity -->
+  <div class="filter-row pills-row" role="group" aria-label="Rarity">
+    <span class="label">Rarity:</span>
+    <button class="pill active" data-rarity="all"        type="button">All</button>
+    <button class="pill"         data-rarity="common"    type="button">Common</button>
+    <button class="pill"         data-rarity="uncommon"  type="button">Uncommon</button>
+    <button class="pill"         data-rarity="rare"      type="button">Rare</button>
+    <button class="pill"         data-rarity="legendary" type="button">Legendary</button>
+    <button class="pill"         data-rarity="mythical"  type="button">Mythical</button>
+    <button class="pill"         data-rarity="divine"    type="button">Divine</button>
+  </div>
+
+  <small id="cropCount" class="muted" aria-live="polite">Showing 0 crops</small>
+</section>
+
+
+
+    <!-- Values Grid -->
+    <section class="values-grid" id="valuesGrid" aria-label="Values results">
+      <!-- Cards injected by values.js -->
+    </section>
+
+    <noscript>
+      <p class="muted center">JavaScript is required to view values. Please enable it and reload.</p>
+    </noscript>
+  </main>
+
+  <!-- FOOTER (white links with underline; styling handled in CSS) -->
+  <footer class="footer-links" style="text-align:center; padding:18px 0 8px;">
+ <div class="wrap" style="max-width:980px; color:#ffffff;">
+  <a href="index.html#mutations" style="color:#ffffff; text-decoration:underline;">Grow A Garden Calculator</a>
+  <span style="color:#ffffff;"> – </span>
+  <a href="trade.html" style="color:#ffffff; text-decoration:underline;">Grow A Garden Trade Calculator</a>
+  <span style="color:#ffffff;"> – </span>
+  <a href="values.html" style="color:#ffffff; text-decoration:underline;">Grow A Garden Values</a>
+</div>
+<br>
+  </footer>
+  <div class="footer-accent">© 2025 Grow A Garden Calculator</div>
+
+  <!-- DATA + PAGE LOGIC -->
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/values.js"></script>
+</body>
+</html>
