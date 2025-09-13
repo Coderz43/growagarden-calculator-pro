@@ -426,36 +426,55 @@ function calc(){
       ].map(x=>`<li>${x}</li>`).join('');
     }
 
-    // --- Log snapshot (debounced, non-blocking) ---
-    try {
-      const snap = {
-        total,
-        crop: state.crop?.name || null,
-        qty,
-        weight: state.weight,
-        friendPct: state.friendPct,
-        maxMutation: !!state.maxMutation,
-        baseFloor: state.baseFloor,
-        growthBonus: g?.add ?? 0,
-        temperatureBonus: t?.add ?? 0,
-        envEntries: (env?.entries || []),
-        // Full payload for future analytics/debug:
-        payload: {
-          baseWeighted, combinedFactor, envMult, fM,
-          inputs: { ...state }
-        }
-      };
-      __logCalcDebounced(snap);
-    } catch(e){ /* ignore */ }
+  // --- Log snapshot (debounced, non-blocking) ---
+try {
+  // derive clean labels for growth/temp
+  const growthChoice =
+    (g && (g.name || g.label)) ? (g.name || g.label) :
+    (g && typeof g.add !== 'undefined') ? `+${g.add}` : null;
 
-  }catch(err){
-    console.error('calc error:', err);
-    const resultEl = $('#result');
-    const breakdown = $('#breakdownList');
-    if (resultEl) resultEl.textContent = '0';
-    if (breakdown) breakdown.innerHTML = `<li>Something went wrong in calculation. Check console.</li>`;
-  }
+  const tempChoice =
+    (t && (t.name || t.label)) ? (t.name || t.label) :
+    (t && typeof t.add !== 'undefined') ? `+${t.add}` : null;
+
+  // count how many environment mutations are selected
+  const envCount = Array.isArray(env?.entries) ? env.entries.length : 0;
+
+  const snap = {
+    // Core summary
+    total,
+    crop: state.crop?.name || null,
+    qty,
+    weight: state.weight,
+
+    // Existing factors
+    friendPct: state.friendPct,
+    maxMutation: !!state.maxMutation,
+    baseFloor: state.baseFloor,
+    growthBonus: g?.add ?? 0,
+    temperatureBonus: t?.add ?? 0,
+    envEntries: (env?.entries || []),
+
+    // NEW explicit fields for reporting
+    growthChoice,
+    tempChoice,
+    envCount,
+
+    // Full payload for debug/analytics
+    payload: {
+      baseWeighted,
+      combinedFactor,
+      envMult,
+      fM,
+      inputs: { ...state }
+    }
+  };
+
+  __logCalcDebounced(snap);
+} catch (e) {
+  console.warn('snapshot logging failed', e);
 }
+
 
 /* ---------- Trade (WFL) ---------- */
 function wireTrade(){
