@@ -1,85 +1,118 @@
 // filename: api/log-calc.js
 import { neon } from '@neondatabase/serverless';
 
-export const config = {
-  runtime: 'edge', // works great on Vercel + Neon http driver
+export const config = { runtime: 'edge' };
+
+const sql = neon(process.env.DATABASE_URL);
+
+// Basic CORS (safe even if same-origin)
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-const sql = neon(process.env.DATABASE_URL); // e.g. postgres://user:pass@host/db
-
-function safeArrayLen(v) {
+function pickFrom(obj, path) {
   try {
-    if (Array.isArray(v)) return v.length;
-    return 0;
+    let cur = obj;
+    for (const key of path) {
+      if (!cur || typeof cur !== 'object' || !(key in cur)) return null;
+      cur = cur[key];
+    }
+    if (cur == null) return null;
+    const s = String(cur);
+    return s.length ? s : null;
   } catch {
-    return 0;
+    return null;
   }
 }
 
-function pick(obj, pathList) {
-  for (const p of pathList) {
-    // p like ['inputs','growth'] or ['growth']
-    let cur = obj;
-    let ok = true;
-    for (const key of p) {
-      if (cur && typeof cur === 'object' && key in cur) {
-        cur = cur[key];
-      } else {
-        ok = false; break;
-      }
+function pickAny(sources, pathList) {
+  for (const src of sources) {
+    if (!src) continue;
+    for (const p of pathList) {
+      const v = pickFrom(src, p);
+      if (v != null) return v;
     }
-    if (ok && cur != null && String(cur).length) return String(cur);
   }
   return null;
 }
 
+function toInt(n) {
+  const x = Number(n);
+  return Number.isFinite(x) ? Math.trunc(x) : null;
+}
+
 export default async function handler(req) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 
-  let body;
+  // Parse the incoming event (your app.js sends a "snapshot" with a nested payload)
+  let event;
   try {
-    body = await req.json();
+    event = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 });
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 
-  const referer    = req.headers.get('referer') || body.referer || null;
-  const userAgent  = req.headers.get('user-agent') || body.user_agent || null;
-  const payload    = body.payload || body || {}; // accept raw body as payload if not nested
+  const referer   = req.headers.get('referer')     || event.referer    || null;
+  const userAgent = req.headers.get('user-agent')  || event.user_agent || null;
 
-  // Derive fields on the server (don’t trust client)
-  const growthChoice = pick(payload, [
-    ['inputs', 'growth'],
-    ['growth'],
-    ['state', 'growth'],
-  ]);
+  // Persist the WHOLE event for debuggability
+  const payload = event;
 
-  const tempChoice = pick(payload, [
-    ['inputs', 'temp'],
-    ['temperature'],
-    ['state', 'temp'],
-  ]);
+  // Derive columns (look in both top-level and nested payload)
+  const growthChoice = pickAny(
+    [event, event.payload],
+    [['inputs','growth'], ['growthChoice'], ['growth'], ['state','growth']]
+  );
 
-  // env candidates: payload.inputs.env (array), payload.env (array), explicit env_count
+  const tempChoice = pickAny(
+    [event, event.payload],
+    [['inputs','temp'], ['tempChoice'], ['temperature'], ['state','temp']]
+  );
+
+  // env_count: prefer array lengths; fall back to numeric fields
   let envCount = 0;
-  try {
-    if (Array.isArray(payload?.inputs?.env)) envCount = payload.inputs.env.length;
-    else if (Array.isArray(payload?.env)) envCount = payload.env.length;
-    else if (typeof payload?.env_count === 'number') envCount = payload.env_count;
-  } catch {
-    envCount = 0;
+  const envCandidates = [
+    event?.inputs?.env,
+    event?.payload?.inputs?.env,
+    event?.env,
+    event?.payload?.env,
+  ];
+  for (const arr of envCandidates) {
+    if (Array.isArray(arr)) { envCount = arr.length; break; }
+  }
+  if (!envCount) {
+    const maybe = toInt(
+      event?.envCount ?? event?.payload?.envCount ?? event?.env_count ?? event?.payload?.env_count
+    );
+    if (maybe != null) envCount = maybe;
   }
 
-  // Insert
   try {
-    await sql/*sql*/`
+    await sql`
       INSERT INTO public.calc_events (referer, user_agent, payload, growth_choice, temp_choice, env_count)
       VALUES (${referer}, ${userAgent}, ${JSON.stringify(payload)}, ${growthChoice}, ${tempChoice}, ${envCount})
     `;
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'DB insert failed', detail: String(e) }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'DB insert failed', detail: String(e) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 }
