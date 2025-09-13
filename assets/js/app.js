@@ -28,7 +28,6 @@ async function __logCalcDebounced(snap) {
     crop: snap.crop, qty: snap.qty, weight: snap.weight,
     baseFloor: snap.baseFloor, friendPct: snap.friendPct,
     maxMutation: snap.maxMutation, total: snap.total,
-    // include these so signature changes when user flips them
     growthChoice: snap.growthChoice || null,
     tempChoice: snap.tempChoice || null,
     envCount: typeof snap.envCount === 'number' ? snap.envCount : 0
@@ -40,11 +39,9 @@ async function __logCalcDebounced(snap) {
     await fetch('/api/log-calc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // API accepts raw body as payload too, but we’ll send the full snap (your API handles this)
       body: JSON.stringify(snap)
     });
   } catch (e) {
-    // Silent fail — never block UI
     console.warn('log-calc failed', e);
   }
 }
@@ -232,7 +229,7 @@ function readInputs(){
   state.baseFloor = Math.max(0, Number($('#baseValue')?.value||0));
   state.weight    = Math.max(0, Number($('#weight')?.value||0));
   state.qty       = Math.max(1, Number($('#qty')?.value||1));
-  state.friendPct = Number($('#friend')?.value||0));
+  state.friendPct = Number($('#friend')?.value||0); // <-- fixed extra paren
   const fp = $('#friendPct'); if (fp) fp.textContent = `${state.friendPct}%`;
 }
 
@@ -256,25 +253,21 @@ function currentGrowth(){
   const g = $('#growthGroup input[type="radio"]:checked');
   const mult = Number(g?.value || 1); // Default=1, Golden=20, Rainbow=50
   const label = g ? g.closest('label')?.querySelector('span')?.textContent?.trim() : 'Default';
-  // Competitor: growth as additive above 1 (e.g., 50→+49)
   return { label: label || 'Default', add: Math.max(0, mult - 1) };
 }
 
 function currentTemp(){
   const t = $('#tempGroup input[type="radio"]:checked');
-  const mult = Number(t?.value || 1); // Our DATA has 1/2/2/5/10
+  const mult = Number(t?.value || 1); // 1/2/2/5/10
   const label = t ? t.closest('label')?.querySelector('span')?.textContent?.trim() : 'Default';
-  // Competitor special-case: Frozen contributes +10 (not +9)
-  const add = /frozen/i.test(label||'') ? 10 : Math.max(0, mult - 1); // Wet→+1, Chilled→+1, Drenched→+4
+  const add = /frozen/i.test(label||'') ? 10 : Math.max(0, mult - 1);
   return { label: label || 'Default', add };
 }
 
 /* ---------- Environmental (exact competitor behavior) ---------- */
 /*
-  Competitor folds Temperature bonus into the Environmental bucket:
-  - Start envSum/envCount with temperatureAdd (if >0).
-  - For each selected pill with multiplier m, add 'm' to sum and +1 to count.
-  - ENV_MULT = 1 + (sum - count)
+  ENV_MULT = 1 + (sum - count)
+  Start with temperature add (if >0) as one env item called "Frozen".
 */
 function readEnvironmentWithTemperature(tempAdd){
   const boxes = $$('#envGroup input[type="checkbox"]');
@@ -297,7 +290,7 @@ function readEnvironmentWithTemperature(tempAdd){
   return { entries, mult, sum, count };
 }
 
-/* ---------- Max Mutation like competitor ---------- */
+/* ---------- Max Mutation ---------- */
 function applyMaxMutation(on){
   const gRadios = $$('#growthGroup input[type="radio"]');
   const tRadios = $$('#tempGroup input[type="radio"]');
@@ -309,7 +302,7 @@ function applyMaxMutation(on){
     gRadios.forEach(r=>{ const v=Number(r.value||1); if (v>maxV){ maxV=v; maxG=r; }});
     if (maxG) maxG.checked = true;
 
-    // temperature -> choose value '10' (Frozen) if present
+    // temperature -> prefer 'Frozen' if present
     let maxT = null, maxTv = -Infinity;
     tRadios.forEach(r=>{
       const label = r.closest('label')?.textContent || '';
@@ -327,14 +320,14 @@ function applyMaxMutation(on){
   }
 }
 
-/* ---------- Calculation (competitor-accurate) ---------- */
+/* ---------- Calculation ---------- */
 function calc(){
   try{
     readInputs();
     const resultEl = $('#result');
     const breakdown = $('#breakdownList');
 
-    // If no crop selected yet, keep UI responsive with defaults (like before)
+    // If no crop selected yet → minimal UI + logging
     if (!state.crop){
       const baseFromInput = 0;
       const rarityAdd = 0;
@@ -362,10 +355,9 @@ function calc(){
         ].map(x=>`<li>${x}</li>`).join('');
       }
 
-      // ======== LOG (no crop) ========
+      // ---- Log (no crop) ----
       const g = { label: 'Default', add: 0 };
       const t = { label: 'Default', add: 0 };
-      const env = { entries: [], mult: 1 };
 
       __logCalcDebounced({
         total,
@@ -406,34 +398,29 @@ function calc(){
     const baseWeighted  = weightedBaseFor(state.crop.name, baseFromInput, state.weight);
 
     // ----- Mutations -----
-    const g = currentGrowth();     // +19 / +49, etc.
-    const t = currentTemp();       // +1 / +4 / +10
-    const combinedBonus  = g.add + t.add;    // EXACT competitor: growthAdd + tempAdd
+    const g = currentGrowth();
+    const t = currentTemp();
+    const combinedBonus  = g.add + t.add;
     const combinedFactor = 1 + combinedBonus;
 
-    // ----- Environmental (fold temperature into env, like competitor) -----
-    const env = readEnvironmentWithTemperature(t.add); // {entries, mult}
+    // ----- Environment (fold temp) -----
+    const env = readEnvironmentWithTemperature(t.add);
     const envMult  = env.mult;
     const envEntries = env.entries;
-
-    // Prepare an array of just the environment names for logging
     const envNames = Array.isArray(envEntries) ? envEntries.map(e => e.name) : [];
 
-    // ----- Friend boost & qty -----
+    // ----- Friend & qty -----
     const fM  = 1 + (state.friendPct/100);
     const qty = state.qty;
 
     // ----- Final total -----
     const total = Math.ceil(baseWeighted * combinedFactor * envMult * fM * qty);
 
-    // ===== UI =====
+    // UI
     if (resultEl) resultEl.textContent = fmt(total);
-
     if (breakdown){
-      // Weight label matches competitor (show "None" if <= threshold)
       const th = thresholdFor(state.crop?.name || '');
-      const atOrBelowThreshold =
-        th != null && state.weight > 0 && state.weight <= (th + 1e-6);
+      const atOrBelowThreshold = th != null && state.weight > 0 && state.weight <= (th + 1e-6);
       const weightLabel =
         (!state.weight || atOrBelowThreshold)
           ? 'Weight Adjustment: None'
@@ -455,7 +442,7 @@ function calc(){
       ].map(x=>`<li>${x}</li>`).join('');
     }
 
-    // ======== LOG (with crop) ========
+    // ---- Log (with crop) ----
     const growthChoice = g?.label || null;
     const tempChoice   = t?.label || null;
     const envCount     = envNames.length;
@@ -485,7 +472,7 @@ function calc(){
         fM,
         inputs: {
           ...state,
-          growth: growthChoice,   // <-- IMPORTANT for API/SQL pickers
+          growth: growthChoice,   // <-- IMPORTANT
           temp: tempChoice,       // <-- IMPORTANT
           env: envNames           // <-- IMPORTANT
         }
@@ -525,9 +512,30 @@ function wireTrade(){
 
 /* ---------- Init ---------- */
 function init(){
+  // Fallback data so Growth/Temperature pills render even if window.DATA is missing
+  const DEFAULT_DATA = {
+    growth: [
+      { label: 'Default', multiplier: 1 },
+      { label: 'Golden',  multiplier: 20 },
+      { label: 'Rainbow', multiplier: 50 }
+    ],
+    temperature: [
+      { label: 'Default', multiplier: 1 },
+      { label: 'Wet',     multiplier: 2 },
+      { label: 'Chilled', multiplier: 2 },
+      { label: 'Drenched',multiplier: 5 },
+      { label: 'Frozen',  multiplier: 10 }
+    ]
+  };
+
+  const GROWTH_DATA = (window.DATA?.growth && window.DATA.growth.length)
+    ? window.DATA.growth : DEFAULT_DATA.growth;
+  const TEMP_DATA   = (window.DATA?.temperature && window.DATA.temperature.length)
+    ? window.DATA.temperature : DEFAULT_DATA.temperature;
+
   // dynamic radios (growth/temp); env checkboxes are in HTML
-  if (window.DATA?.growth)      mountChoices(window.DATA.growth,      $('#growthGroup'), 'growth');
-  if (window.DATA?.temperature) mountChoices(window.DATA.temperature, $('#tempGroup'),  'temp');
+  mountChoices(GROWTH_DATA, $('#growthGroup'), 'growth');
+  mountChoices(TEMP_DATA,   $('#tempGroup'),  'temp');
 
   // env & temp listeners ensure immediate recompute when folded math changes
   $$('#envGroup input[type="checkbox"]').forEach(cb=> cb.addEventListener('change', calc));
