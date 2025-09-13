@@ -3,68 +3,90 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Calc Events Logs</title>
-  <link rel="icon" href="/favicon.ico">
+  <title>Calc Events</title>
   <style>
-    :root { color-scheme: dark; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b0f0c; color:#e8efe9; margin:0; }
-    header { position:sticky; top:0; backdrop-filter: blur(8px); background:#0b0f0ccc; padding:12px 16px; border-bottom:1px solid #223; }
-    h1 { margin:0 0 6px; font-size:18px; }
-    .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    input, select, button { background:#121814; color:#e8efe9; border:1px solid #2b3; border-radius:8px; padding:8px 10px; }
+    body { font-family: ui-sans-serif, system-ui, Arial; background:#0b0e11; color:#eaeaea; padding:20px; }
+    h1 { margin:0 0 16px; font-weight:700; }
+    .bar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+    input, select, button {
+      background:#11161c; color:#eaeaea; border:1px solid #26313d; border-radius:8px; padding:8px 10px;
+    }
     button { cursor:pointer; }
-    .wrap { padding:16px; }
-    table { width:100%; border-collapse:collapse; margin-top:12px; font-size:14px; }
-    th, td { padding:10px 8px; border-bottom:1px solid #1c231e; text-align:left; }
-    th { position:sticky; top:64px; background:#0b0f0c; z-index:1; }
-    .muted { opacity:.7 }
-    .right { text-align:right; }
-    .small { font-size:12px; }
-    .pill { padding:2px 8px; border-radius:999px; border:1px solid #2b3; }
-    .bar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:8px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:10px; border-bottom:1px solid #1d2630; text-align:left; }
+    th { position:sticky; top:0; background:#0d1117; }
+    .pill { font-size:12px; padding:2px 6px; border-radius:999px; background:#1d2a34; border:1px solid #2b3a46; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Calc Events (read-only)</h1>
-    <div class="controls">
-      <input id="q" placeholder="Search crop / growth / temp…" />
-      <select id="limit">
-        <option>25</option><option>50</option><option>100</option>
+  <h1>Calculation Logs</h1>
+
+  <div class="bar">
+    <input id="q" placeholder="Search crop / growth / temp…" />
+    <label>Sort
+      <select id="orderBy">
+        <option value="created_at">Newest</option>
+        <option value="total">Total</option>
+        <option value="weight">Weight</option>
       </select>
-      <button id="btnSearch">Search</button>
-      <span id="meta" class="muted small"></span>
-      <span style="flex:1"></span>
-      <button id="btnCsv">Export CSV</button>
-    </div>
-  </header>
-
-  <div class="wrap">
-    <div class="bar">
-      <div class="muted small" id="status">Loading…</div>
-      <div>
-        <button id="prev">◀ Prev</button>
-        <button id="next">Next ▶</button>
-      </div>
-    </div>
-
-    <table id="tbl">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Created</th>
-          <th class="right">Total</th>
-          <th>Crop</th>
-          <th class="right">Weight</th>
-          <th class="right">Env</th>
-          <th>Growth</th>
-          <th>Temp</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    </label>
+    <label>Dir
+      <select id="dir">
+        <option value="desc">DESC</option>
+        <option value="asc">ASC</option>
+      </select>
+    </label>
+    <label>Page <input id="page" type="number" min="1" value="1" style="width:70px" /></label>
+    <label>Limit <input id="limit" type="number" min="1" max="100" value="25" style="width:70px" /></label>
+    <button id="go">Load</button>
   </div>
 
-  <script src="/logs.js" type="module"></script>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Crop</th>
+        <th>Total</th>
+        <th>Weight</th>
+        <th>Growth</th>
+        <th>Temp</th>
+        <th>Env Count</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const fmt = n => Number(n||0).toLocaleString();
+
+    async function load() {
+      const params = new URLSearchParams({
+        q: $('#q').value.trim(),
+        page: $('#page').value || '1',
+        limit: $('#limit').value || '25',
+        orderBy: $('#orderBy').value,
+        dir: $('#dir').value
+      });
+      const r = await fetch('/api/get-calcs?'+params.toString());
+      const { rows=[] } = await r.json();
+
+      $('#rows').innerHTML = rows.map(r => `
+        <tr>
+          <td>${new Date(r.created_at).toLocaleString()}</td>
+          <td>${r.crop ?? '-'}</td>
+          <td>${fmt(r.total)}</td>
+          <td>${r.weight ?? '-'}</td>
+          <td><span class="pill">${r.growth_choice ?? '-'}</span></td>
+          <td><span class="pill">${r.temp_choice ?? '-'}</span></td>
+          <td>${r.env_count ?? 0}</td>
+        </tr>
+      `).join('');
+    }
+
+    $('#go').addEventListener('click', load);
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Enter') load(); });
+    load();
+  </script>
 </body>
 </html>
