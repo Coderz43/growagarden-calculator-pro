@@ -229,7 +229,7 @@ function readInputs(){
   state.baseFloor = Math.max(0, Number($('#baseValue')?.value||0));
   state.weight    = Math.max(0, Number($('#weight')?.value||0));
   state.qty       = Math.max(1, Number($('#qty')?.value||1));
-  state.friendPct = Number($('#friend')?.value||0); // <-- fixed extra paren
+  state.friendPct = Number($('#friend')?.value || 0); 
   const fp = $('#friendPct'); if (fp) fp.textContent = `${state.friendPct}%`;
 }
 
@@ -327,7 +327,7 @@ function calc(){
     const resultEl = $('#result');
     const breakdown = $('#breakdownList');
 
-    // If no crop selected yet → minimal UI + logging
+    // If no crop selected yet → minimal UI (no logging to avoid duplicate rows)
     if (!state.crop){
       const baseFromInput = 0;
       const rarityAdd = 0;
@@ -355,43 +355,10 @@ function calc(){
         ].map(x=>`<li>${x}</li>`).join('');
       }
 
-      // ---- Log (no crop) ----
-      const g = { label: 'Default', add: 0 };
-      const t = { label: 'Default', add: 0 };
-
-      __logCalcDebounced({
-        total,
-        crop: null,
-        qty,
-        weight: state.weight,
-        friendPct: state.friendPct,
-        maxMutation: !!state.maxMutation,
-        baseFloor: state.baseFloor,
-        growthBonus: 0,
-        temperatureBonus: 0,
-        envEntries: [],
-
-        growthChoice: g.label,
-        tempChoice: t.label,
-        envCount: 0,
-        referer: location.href,
-
-        payload: {
-          baseWeighted: baseFromInput,
-          combinedFactor: 1,
-          envMult,
-          fM,
-          inputs: {
-            ...state,
-            growth: g.label,
-            temp: t.label,
-            env: []
-          }
-        }
-      });
-
+      // NOTE: no logging here (boot snapshot skipped)
       return;
     }
+
 
     // ----- Base (with piecewise weight) -----
     const baseFromInput = Math.max(state.baseFloor, Number(state.crop.base||0));
