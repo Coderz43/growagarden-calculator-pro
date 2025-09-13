@@ -1,92 +1,60 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Calc Events</title>
-  <style>
-    body { font-family: ui-sans-serif, system-ui, Arial; background:#0b0e11; color:#eaeaea; padding:20px; }
-    h1 { margin:0 0 16px; font-weight:700; }
-    .bar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
-    input, select, button {
-      background:#11161c; color:#eaeaea; border:1px solid #26313d; border-radius:8px; padding:8px 10px;
-    }
-    button { cursor:pointer; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { padding:10px; border-bottom:1px solid #1d2630; text-align:left; }
-    th { position:sticky; top:0; background:#0d1117; }
-    .pill { font-size:12px; padding:2px 6px; border-radius:999px; background:#1d2a34; border:1px solid #2b3a46; }
-  </style>
-</head>
-<body>
-  <h1>Calculation Logs</h1>
-
-  <div class="bar">
-    <input id="q" placeholder="Search crop / growth / temp…" />
-    <label>Sort
-      <select id="orderBy">
-        <option value="created_at">Newest</option>
-        <option value="total">Total</option>
-        <option value="weight">Weight</option>
-      </select>
-    </label>
-    <label>Dir
-      <select id="dir">
-        <option value="desc">DESC</option>
-        <option value="asc">ASC</option>
-      </select>
-    </label>
-    <label>Page <input id="page" type="number" min="1" value="1" style="width:70px" /></label>
-    <label>Limit <input id="limit" type="number" min="1" max="100" value="25" style="width:70px" /></label>
-    <button id="go">Load</button>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>Crop</th>
-        <th>Total</th>
-        <th>Weight</th>
-        <th>Growth</th>
-        <th>Temp</th>
-        <th>Env Count</th>
-      </tr>
-    </thead>
-    <tbody id="rows"></tbody>
-  </table>
-
-  <script>
-    const $ = s => document.querySelector(s);
-    const fmt = n => Number(n||0).toLocaleString();
-
-    async function load() {
-      const params = new URLSearchParams({
-        q: $('#q').value.trim(),
-        page: $('#page').value || '1',
-        limit: $('#limit').value || '25',
-        orderBy: $('#orderBy').value,
-        dir: $('#dir').value
-      });
-      const r = await fetch('/api/get-calcs?'+params.toString());
-      const { rows=[] } = await r.json();
-
-      $('#rows').innerHTML = rows.map(r => `
-        <tr>
-          <td>${new Date(r.created_at).toLocaleString()}</td>
-          <td>${r.crop ?? '-'}</td>
-          <td>${fmt(r.total)}</td>
-          <td>${r.weight ?? '-'}</td>
-          <td><span class="pill">${r.growth_choice ?? '-'}</span></td>
-          <td><span class="pill">${r.temp_choice ?? '-'}</span></td>
-          <td>${r.env_count ?? 0}</td>
-        </tr>
-      `).join('');
-    }
-
-    $('#go').addEventListener('click', load);
-    document.addEventListener('keydown', (e)=>{ if(e.key==='Enter') load(); });
-    load();
-  </script>
-</body>
-</html>
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calculation Logs</title>
+<style>
+body{font-family:ui-sans-serif,system-ui,Arial;background:#0b0e11;color:#eaeaea;padding:20px}
+h1{margin:0 0 16px;font-weight:700}
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+input,select,button{background:#11161c;color:#eaeaea;border:1px solid #26313d;border-radius:8px;padding:8px 10px}
+button{cursor:pointer}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #1d2630;text-align:left}
+th{position:sticky;top:0;background:#0d1117}
+.pill{font-size:12px;padding:2px 6px;border-radius:999px;background:#1d2a34;border:1px solid #2b3a46}
+</style></head><body>
+<h1>Calculation Logs</h1>
+<div class="bar">
+  <input id="q" placeholder="Search crop / growth / temp…">
+  <label>Sort
+    <select id="orderBy">
+      <option value="created_at">Newest</option>
+      <option value="total">Total</option>
+      <option value="weight">Weight</option>
+    </select>
+  </label>
+  <label>Dir
+    <select id="dir"><option value="desc">DESC</option><option value="asc">ASC</option></select>
+  </label>
+  <label>Page <input id="page" type="number" min="1" value="1" style="width:70px"></label>
+  <label>Limit <input id="limit" type="number" min="1" max="100" value="25" style="width:70px"></label>
+  <button id="go">Load</button>
+</div>
+<table>
+  <thead><tr>
+    <th>Time</th><th>Crop</th><th>Total</th><th>Weight</th><th>Growth</th><th>Temp</th><th>Env</th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<script>
+const $=s=>document.querySelector(s), fmt=n=>Number(n||0).toLocaleString();
+async function load(){
+  const p=new URLSearchParams({
+    q:$('#q').value.trim(), page:$('#page').value||'1', limit:$('#limit').value||'25',
+    orderBy:$('#orderBy').value, dir:$('#dir').value
+  });
+  const r=await fetch('/api/get-calcs?'+p.toString()); if(!r.ok){console.error('get-calcs fail'); return;}
+  const {rows=[]}=await r.json();
+  $('#rows').innerHTML = rows.map(r=>`
+    <tr>
+      <td>${new Date(r.created_at).toLocaleString()}</td>
+      <td>${r.crop??'-'}</td>
+      <td>${fmt(r.total)}</td>
+      <td>${r.weight??'-'}</td>
+      <td><span class="pill">${r.growth_choice??'-'}</span></td>
+      <td><span class="pill">${r.temp_choice??'-'}</span></td>
+      <td>${r.env_count??0}</td>
+    </tr>`).join('');
+}
+$('#go').addEventListener('click',load); document.addEventListener('keydown',e=>{if(e.key==='Enter')load()}); load();
+</script>
+</body></html>
