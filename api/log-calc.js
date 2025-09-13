@@ -2,10 +2,8 @@
 import { neon } from '@neondatabase/serverless';
 
 export const config = { runtime: 'edge' };
-
 const sql = neon(process.env.DATABASE_URL);
 
-// Basic CORS (safe even if same-origin)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
@@ -20,11 +18,9 @@ function pickFrom(obj, path) {
       cur = cur[k];
     }
     if (cur == null) return null;
-    const s = String(cur);
-    return s.length ? s : null;
+    return String(cur);
   } catch { return null; }
 }
-
 function pickAny(sources, paths) {
   for (const src of sources) {
     if (!src) continue;
@@ -35,15 +31,14 @@ function pickAny(sources, paths) {
   }
   return null;
 }
-
-function toInt(n) {
+const toInt = (n)=> {
   const x = Number(n);
   return Number.isFinite(x) ? Math.trunc(x) : null;
-}
-function toNum(n) {
+};
+const toNum = (n)=> {
   const x = Number(n);
   return Number.isFinite(x) ? x : null;
-}
+};
 
 export default async function handler(req) {
   if (req.method === 'OPTIONS') {
@@ -55,7 +50,7 @@ export default async function handler(req) {
     });
   }
 
-  // Parse JSON
+  // parse
   let event;
   try { event = await req.json(); }
   catch {
@@ -64,7 +59,7 @@ export default async function handler(req) {
     });
   }
 
-  // Sanitize payload (referer / user_agent ko hata do agar aaye hon)
+  // sanitize payload for storage (UA/referer ko hata do agar aaye hon)
   const payload = { ...(event || {}) };
   delete payload.referer;
   delete payload.user_agent;
@@ -72,8 +67,9 @@ export default async function handler(req) {
     delete payload.payload.referer;
     delete payload.payload.user_agent;
   }
+  const payloadJSON = JSON.stringify(payload);
 
-  // Derive fields (from top-level or nested payload)
+  // derived fields
   const growthChoice = pickAny([event, event?.payload],
     [['inputs','growth'], ['growthChoice'], ['growth'], ['state','growth']]);
   const tempChoice = pickAny([event, event?.payload],
@@ -88,18 +84,25 @@ export default async function handler(req) {
     if (maybe != null) envCount = maybe;
   }
 
-  // Separate columns: total / crop / weight
+  // primary extraction
   const total  = toInt(pickAny([event, event?.payload], [['total']]));
   const crop   = pickAny([event, event?.payload], [['crop'], ['inputs','crop'], ['state','crop']]);
   const weight = toNum(pickAny([event, event?.payload], [['weight'], ['inputs','weight']]));
 
   try {
+    // SQL fallback: if JS-side null, pull from payload JSON
     await sql/*sql*/`
       INSERT INTO public.calc_events
         (payload, growth_choice, temp_choice, env_count, total, crop, weight)
-      VALUES
-        (${JSON.stringify(payload)}, ${growthChoice}, ${tempChoice}, ${envCount},
-         ${total}, ${crop}, ${weight})
+      VALUES (
+        ${payloadJSON}::jsonb,
+        ${growthChoice},
+        ${tempChoice},
+        ${envCount},
+        COALESCE(${total},  (${payloadJSON}::jsonb->>'total')::bigint),
+        COALESCE(${crop},   ${payloadJSON}::jsonb->>'crop'),
+        COALESCE(${weight}, (${payloadJSON}::jsonb->>'weight')::numeric)
+      )
     `;
     return new Response(JSON.stringify({ ok: true }), {
       status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders },
