@@ -3,7 +3,9 @@ import { neon } from '@neondatabase/serverless';
 
 export const config = { runtime: 'edge' };
 
-// CORS
+const sql = neon(process.env.DATABASE_URL);
+
+// Basic CORS (safe even if same-origin)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
@@ -13,30 +15,34 @@ const corsHeaders = {
 function pickFrom(obj, path) {
   try {
     let cur = obj;
-    for (const key of path) {
-      if (!cur || typeof cur !== 'object' || !(key in cur)) return null;
-      cur = cur[key];
+    for (const k of path) {
+      if (!cur || typeof cur !== 'object' || !(k in cur)) return null;
+      cur = cur[k];
     }
     if (cur == null) return null;
     const s = String(cur);
     return s.length ? s : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
-function pickAny(sources, pathList) {
+
+function pickAny(sources, paths) {
   for (const src of sources) {
     if (!src) continue;
-    for (const p of pathList) {
+    for (const p of paths) {
       const v = pickFrom(src, p);
       if (v != null) return v;
     }
   }
   return null;
 }
+
 function toInt(n) {
   const x = Number(n);
   return Number.isFinite(x) ? Math.trunc(x) : null;
+}
+function toNum(n) {
+  const x = Number(n);
+  return Number.isFinite(x) ? x : null;
 }
 
 export default async function handler(req) {
@@ -49,28 +55,10 @@ export default async function handler(req) {
     });
   }
 
-  // 🔐 Use multiple env fallbacks so all previews work
-  const DB_URL =
-    process.env.DATABASE_URL ||
-    process.env.NEON_DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_PRISMA_URL ||
-    process.env.DATABASE_URL_UNPOOLED ||
-    process.env.POSTGRES_URL_NON_POOLING;
-
-  if (!DB_URL) {
-    return new Response(JSON.stringify({ error: 'DB URL missing' }), {
-      status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
-  }
-
-  const sql = neon(DB_URL);
-
-  // Parse incoming event
+  // Parse JSON
   let event;
-  try {
-    event = await req.json();
-  } catch {
+  try { event = await req.json(); }
+  catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
       status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
@@ -79,39 +67,36 @@ export default async function handler(req) {
   const referer   = req.headers.get('referer')    || event.referer    || null;
   const userAgent = req.headers.get('user-agent') || event.user_agent || null;
 
-  const payload = event; // store whole snapshot for debugging
+  // Persist full event for debugging/analytics
+  const payload = event;
 
-  // Derived columns
-  const growthChoice = pickAny(
-    [event, event.payload],
-    [['inputs','growth'], ['growthChoice'], ['growth'], ['state','growth']]
-  );
-  const tempChoice = pickAny(
-    [event, event.payload],
-    [['inputs','temp'], ['tempChoice'], ['temperature'], ['state','temp']]
-  );
+  // Derive fields (from top-level or nested payload)
+  const growthChoice = pickAny([event, event.payload],
+    [['inputs','growth'], ['growthChoice'], ['growth'], ['state','growth']]);
+  const tempChoice = pickAny([event, event.payload],
+    [['inputs','temp'], ['tempChoice'], ['temperature'], ['state','temp']]);
 
   let envCount = 0;
-  const envCandidates = [
-    event?.inputs?.env,
-    event?.payload?.inputs?.env,
-    event?.env,
-    event?.payload?.env,
-  ];
-  for (const arr of envCandidates) {
+  for (const arr of [event?.inputs?.env, event?.payload?.inputs?.env, event?.env, event?.payload?.env]) {
     if (Array.isArray(arr)) { envCount = arr.length; break; }
   }
   if (!envCount) {
-    const maybe = toInt(
-      event?.envCount ?? event?.payload?.envCount ?? event?.env_count ?? event?.payload?.env_count
-    );
+    const maybe = toInt(event?.envCount ?? event?.payload?.envCount ?? event?.env_count ?? event?.payload?.env_count);
     if (maybe != null) envCount = maybe;
   }
 
+  // NEW: total / crop / weight columns
+  const total  = toInt(pickAny([event, event.payload], [['total']]));
+  const crop   = pickAny([event, event.payload], [['crop'], ['inputs','crop'], ['state','crop']]);
+  const weight = toNum(pickAny([event, event.payload], [['weight'], ['inputs','weight']]));
+
   try {
-    await sql`
-      INSERT INTO public.calc_events (referer, user_agent, payload, growth_choice, temp_choice, env_count)
-      VALUES (${referer}, ${userAgent}, ${JSON.stringify(payload)}, ${growthChoice}, ${tempChoice}, ${envCount})
+    await sql/*sql*/`
+      INSERT INTO public.calc_events
+        (referer, user_agent, payload, growth_choice, temp_choice, env_count, total, crop, weight)
+      VALUES
+        (${referer}, ${userAgent}, ${JSON.stringify(payload)}, ${growthChoice}, ${tempChoice}, ${envCount},
+         ${total}, ${crop}, ${weight})
     `;
     return new Response(JSON.stringify({ ok: true }), {
       status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders },
