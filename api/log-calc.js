@@ -3,9 +3,7 @@ import { neon } from '@neondatabase/serverless';
 
 export const config = { runtime: 'edge' };
 
-const sql = neon(process.env.DATABASE_URL);
-
-// Basic CORS (safe even if same-origin)
+// CORS
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
@@ -26,7 +24,6 @@ function pickFrom(obj, path) {
     return null;
   }
 }
-
 function pickAny(sources, pathList) {
   for (const src of sources) {
     if (!src) continue;
@@ -37,7 +34,6 @@ function pickAny(sources, pathList) {
   }
   return null;
 }
-
 function toInt(n) {
   const x = Number(n);
   return Number.isFinite(x) ? Math.trunc(x) : null;
@@ -49,40 +45,52 @@ export default async function handler(req) {
   }
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      status: 405, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 
-  // Parse the incoming event (your app.js sends a "snapshot" with a nested payload)
+  // 🔐 Use multiple env fallbacks so all previews work
+  const DB_URL =
+    process.env.DATABASE_URL ||
+    process.env.NEON_DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.DATABASE_URL_UNPOOLED ||
+    process.env.POSTGRES_URL_NON_POOLING;
+
+  if (!DB_URL) {
+    return new Response(JSON.stringify({ error: 'DB URL missing' }), {
+      status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
+  }
+
+  const sql = neon(DB_URL);
+
+  // Parse incoming event
   let event;
   try {
     event = await req.json();
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 
-  const referer   = req.headers.get('referer')     || event.referer    || null;
-  const userAgent = req.headers.get('user-agent')  || event.user_agent || null;
+  const referer   = req.headers.get('referer')    || event.referer    || null;
+  const userAgent = req.headers.get('user-agent') || event.user_agent || null;
 
-  // Persist the WHOLE event for debuggability
-  const payload = event;
+  const payload = event; // store whole snapshot for debugging
 
-  // Derive columns (look in both top-level and nested payload)
+  // Derived columns
   const growthChoice = pickAny(
     [event, event.payload],
     [['inputs','growth'], ['growthChoice'], ['growth'], ['state','growth']]
   );
-
   const tempChoice = pickAny(
     [event, event.payload],
     [['inputs','temp'], ['tempChoice'], ['temperature'], ['state','temp']]
   );
 
-  // env_count: prefer array lengths; fall back to numeric fields
   let envCount = 0;
   const envCandidates = [
     event?.inputs?.env,
@@ -106,13 +114,11 @@ export default async function handler(req) {
       VALUES (${referer}, ${userAgent}, ${JSON.stringify(payload)}, ${growthChoice}, ${tempChoice}, ${envCount})
     `;
     return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: 'DB insert failed', detail: String(e) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 }
