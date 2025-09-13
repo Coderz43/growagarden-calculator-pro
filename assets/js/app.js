@@ -27,7 +27,11 @@ async function __logCalcDebounced(snap) {
   const sig = JSON.stringify({
     crop: snap.crop, qty: snap.qty, weight: snap.weight,
     baseFloor: snap.baseFloor, friendPct: snap.friendPct,
-    maxMutation: snap.maxMutation, total: snap.total
+    maxMutation: snap.maxMutation, total: snap.total,
+    // include these so signature changes when user flips them
+    growthChoice: snap.growthChoice || null,
+    tempChoice: snap.tempChoice || null,
+    envCount: typeof snap.envCount === 'number' ? snap.envCount : 0
   });
   if (sig === __lastSig && (now - __lastSentAt) < __LOG_COOLDOWN_MS) return;
   __lastSig = sig; __lastSentAt = now;
@@ -36,6 +40,7 @@ async function __logCalcDebounced(snap) {
     await fetch('/api/log-calc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // API accepts raw body as payload too, but we’ll send the full snap (your API handles this)
       body: JSON.stringify(snap)
     });
   } catch (e) {
@@ -227,7 +232,7 @@ function readInputs(){
   state.baseFloor = Math.max(0, Number($('#baseValue')?.value||0));
   state.weight    = Math.max(0, Number($('#weight')?.value||0));
   state.qty       = Math.max(1, Number($('#qty')?.value||1));
-  state.friendPct = Number($('#friend')?.value||0);
+  state.friendPct = Number($('#friend')?.value||0));
   const fp = $('#friendPct'); if (fp) fp.textContent = `${state.friendPct}%`;
 }
 
@@ -357,7 +362,11 @@ function calc(){
         ].map(x=>`<li>${x}</li>`).join('');
       }
 
-      // Log minimal snapshot (keeps behavior same; logging is non-blocking)
+      // ======== LOG (no crop) ========
+      const g = { label: 'Default', add: 0 };
+      const t = { label: 'Default', add: 0 };
+      const env = { entries: [], mult: 1 };
+
       __logCalcDebounced({
         total,
         crop: null,
@@ -369,7 +378,24 @@ function calc(){
         growthBonus: 0,
         temperatureBonus: 0,
         envEntries: [],
-        payload: { inputs: { ...state } }
+
+        growthChoice: g.label,
+        tempChoice: t.label,
+        envCount: 0,
+        referer: location.href,
+
+        payload: {
+          baseWeighted: baseFromInput,
+          combinedFactor: 1,
+          envMult,
+          fM,
+          inputs: {
+            ...state,
+            growth: g.label,
+            temp: t.label,
+            env: []
+          }
+        }
       });
 
       return;
@@ -389,6 +415,9 @@ function calc(){
     const env = readEnvironmentWithTemperature(t.add); // {entries, mult}
     const envMult  = env.mult;
     const envEntries = env.entries;
+
+    // Prepare an array of just the environment names for logging
+    const envNames = Array.isArray(envEntries) ? envEntries.map(e => e.name) : [];
 
     // ----- Friend boost & qty -----
     const fM  = 1 + (state.friendPct/100);
@@ -426,55 +455,49 @@ function calc(){
       ].map(x=>`<li>${x}</li>`).join('');
     }
 
-  // --- Log snapshot (debounced, non-blocking) ---
-try {
-  // derive clean labels for growth/temp
-  const growthChoice =
-    (g && (g.name || g.label)) ? (g.name || g.label) :
-    (g && typeof g.add !== 'undefined') ? `+${g.add}` : null;
+    // ======== LOG (with crop) ========
+    const growthChoice = g?.label || null;
+    const tempChoice   = t?.label || null;
+    const envCount     = envNames.length;
 
-  const tempChoice =
-    (t && (t.name || t.label)) ? (t.name || t.label) :
-    (t && typeof t.add !== 'undefined') ? `+${t.add}` : null;
+    const snap = {
+      total,
+      crop: state.crop?.name || null,
+      qty,
+      weight: state.weight,
 
-  // count how many environment mutations are selected
-  const envCount = Array.isArray(env?.entries) ? env.entries.length : 0;
+      friendPct: state.friendPct,
+      maxMutation: !!state.maxMutation,
+      baseFloor: state.baseFloor,
+      growthBonus: g?.add ?? 0,
+      temperatureBonus: t?.add ?? 0,
+      envEntries: envEntries,
 
-  const snap = {
-    // Core summary
-    total,
-    crop: state.crop?.name || null,
-    qty,
-    weight: state.weight,
+      growthChoice,
+      tempChoice,
+      envCount,
+      referer: location.href,
 
-    // Existing factors
-    friendPct: state.friendPct,
-    maxMutation: !!state.maxMutation,
-    baseFloor: state.baseFloor,
-    growthBonus: g?.add ?? 0,
-    temperatureBonus: t?.add ?? 0,
-    envEntries: (env?.entries || []),
+      payload: {
+        baseWeighted,
+        combinedFactor,
+        envMult,
+        fM,
+        inputs: {
+          ...state,
+          growth: growthChoice,   // <-- IMPORTANT for API/SQL pickers
+          temp: tempChoice,       // <-- IMPORTANT
+          env: envNames           // <-- IMPORTANT
+        }
+      }
+    };
 
-    // NEW explicit fields for reporting
-    growthChoice,
-    tempChoice,
-    envCount,
+    __logCalcDebounced(snap);
 
-    // Full payload for debug/analytics
-    payload: {
-      baseWeighted,
-      combinedFactor,
-      envMult,
-      fM,
-      inputs: { ...state }
-    }
-  };
-
-  __logCalcDebounced(snap);
-} catch (e) {
-  console.warn('snapshot logging failed', e);
+  } catch (e) {
+    console.warn('calc failed', e);
+  }
 }
-
 
 /* ---------- Trade (WFL) ---------- */
 function wireTrade(){

@@ -1,130 +1,85 @@
-// api/log-calc.js
-import { sql, ensureCalcEventsTable } from '../lib/db.js';
+// filename: api/log-calc.js
+import { neon } from '@neondatabase/serverless';
 
-const ALLOW_ORIGINS = [
-  // Add your domains here (production + preview). For quick start, we allow all:
-  '*'
-];
+export const config = {
+  runtime: 'edge', // works great on Vercel + Neon http driver
+};
 
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', ALLOW_ORIGINS.includes('*') ? '*' : ALLOW_ORIGINS.join(','));
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+const sql = neon(process.env.DATABASE_URL); // e.g. postgres://user:pass@host/db
+
+function safeArrayLen(v) {
+  try {
+    if (Array.isArray(v)) return v.length;
+    return 0;
+  } catch {
+    return 0;
+  }
 }
 
-export default async function handler(req, res) {
-  cors(res);
-  if (req.method === 'OPTIONS') return res.status(200).end();
+function pick(obj, pathList) {
+  for (const p of pathList) {
+    // p like ['inputs','growth'] or ['growth']
+    let cur = obj;
+    let ok = true;
+    for (const key of p) {
+      if (cur && typeof cur === 'object' && key in cur) {
+        cur = cur[key];
+      } else {
+        ok = false; break;
+      }
+    }
+    if (ok && cur != null && String(cur).length) return String(cur);
+  }
+  return null;
+}
 
+export default async function handler(req) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
   }
 
+  let body;
   try {
-    await ensureCalcEventsTable();
-
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    // Basic fields we expect from frontend; 'payload' stores the full snapshot
-    const {
-      total,
-      crop,
-      qty,
-      weight,
-      friendPct,
-      maxMutation,
-      baseFloor,
-      growthBonus,
-      temperatureBonus,
-      envEntries,
-      payload
-    } = body;
-
-    const ua = req.headers['user-agent'] || null;
-    const referer = req.headers['referer'] || null;
-
-    await sql`
-      INSERT INTO calc_events (
-        total, crop, qty, weight, friend_pct, max_mutation, base_floor,
-        growth_bonus, temperature_bonus, env, ua, referer, payload
-      )
-      VALUES (
-        ${total}, ${crop}, ${qty}, ${weight}, ${friendPct}, ${maxMutation}, ${baseFloor},
-        ${growthBonus}, ${temperatureBonus}, ${envEntries ? JSON.stringify(envEntries) : null},
-        ${ua}, ${referer}, ${payload ? JSON.stringify(payload) : null}
-      )
-    `;
-
-    return res.status(200).json({ ok: true });
-  } catch (err) {
-    console.error('log-calc error', err);
-    return res.status(500).json({ ok: false, error: 'DB insert failed' });
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 });
   }
-}
-// api/log-calc.js
-import { sql, ensureCalcEventsTable } from '../lib/db.js';
 
-const ALLOW_ORIGINS = [
-  // Update these later to your real domains:
-  // 'https://<your-vercel-app>.vercel.app',
-  // 'https://<your-hostinger-domain>',
-  '*'
-];
+  const referer    = req.headers.get('referer') || body.referer || null;
+  const userAgent  = req.headers.get('user-agent') || body.user_agent || null;
+  const payload    = body.payload || body || {}; // accept raw body as payload if not nested
 
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', ALLOW_ORIGINS.includes('*') ? '*' : ALLOW_ORIGINS.join(','));
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
+  // Derive fields on the server (don’t trust client)
+  const growthChoice = pick(payload, [
+    ['inputs', 'growth'],
+    ['growth'],
+    ['state', 'growth'],
+  ]);
 
-export default async function handler(req, res) {
-  cors(res);
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+  const tempChoice = pick(payload, [
+    ['inputs', 'temp'],
+    ['temperature'],
+    ['state', 'temp'],
+  ]);
 
+  // env candidates: payload.inputs.env (array), payload.env (array), explicit env_count
+  let envCount = 0;
   try {
-    await ensureCalcEventsTable();
+    if (Array.isArray(payload?.inputs?.env)) envCount = payload.inputs.env.length;
+    else if (Array.isArray(payload?.env)) envCount = payload.env.length;
+    else if (typeof payload?.env_count === 'number') envCount = payload.env_count;
+  } catch {
+    envCount = 0;
+  }
 
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-
-    // NEW fields added: growthChoice, tempChoice, envCount
-    const {
-      total,
-      crop,
-      qty,
-      weight,
-      friendPct,
-      maxMutation,
-      baseFloor,
-      growthBonus,
-      temperatureBonus,
-      envEntries,
-      payload,
-      growthChoice,
-      tempChoice,
-      envCount
-    } = body;
-
-    const ua = req.headers['user-agent'] || null;
-    const referer = req.headers['referer'] || null;
-
-    await sql`
-      INSERT INTO calc_events (
-        total, crop, qty, weight, friend_pct, max_mutation, base_floor,
-        growth_bonus, temperature_bonus, env, ua, referer, payload,
-        growth_choice, temp_choice, env_count
-      )
-      VALUES (
-        ${total}, ${crop}, ${qty}, ${weight}, ${friendPct}, ${maxMutation}, ${baseFloor},
-        ${growthBonus}, ${temperatureBonus},
-        ${envEntries ? JSON.stringify(envEntries) : null},
-        ${ua}, ${referer}, ${payload ? JSON.stringify(payload) : null},
-        ${growthChoice || null}, ${tempChoice || null}, ${Number.isFinite(envCount) ? envCount : null}
-      )
+  // Insert
+  try {
+    await sql/*sql*/`
+      INSERT INTO public.calc_events (referer, user_agent, payload, growth_choice, temp_choice, env_count)
+      VALUES (${referer}, ${userAgent}, ${JSON.stringify(payload)}, ${growthChoice}, ${tempChoice}, ${envCount})
     `;
-
-    return res.status(200).json({ ok: true });
-  } catch (err) {
-    console.error('log-calc error', err);
-    return res.status(500).json({ ok: false, error: String(err?.message || err) });
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: 'DB insert failed', detail: String(e) }), { status: 500 });
   }
 }
