@@ -5,7 +5,7 @@ export const config = { runtime: 'edge' };
 
 const sql = neon(process.env.DATABASE_URL);
 
-// CORS (safe even same-origin)
+// Basic CORS (safe even if same-origin)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
@@ -24,6 +24,7 @@ function pickFrom(obj, path) {
     return s.length ? s : null;
   } catch { return null; }
 }
+
 function pickAny(sources, paths) {
   for (const src of sources) {
     if (!src) continue;
@@ -34,8 +35,15 @@ function pickAny(sources, paths) {
   }
   return null;
 }
-const toInt = n => Number.isFinite(+n) ? Math.trunc(+n) : null;
-const toNum = n => Number.isFinite(+n) ? +n : null;
+
+function toInt(n) {
+  const x = Number(n);
+  return Number.isFinite(x) ? Math.trunc(x) : null;
+}
+function toNum(n) {
+  const x = Number(n);
+  return Number.isFinite(x) ? x : null;
+}
 
 export default async function handler(req) {
   if (req.method === 'OPTIONS') {
@@ -47,7 +55,7 @@ export default async function handler(req) {
     });
   }
 
-  // Parse body (app.js sends snapshot; support both top-level & nested payload)
+  // Parse JSON
   let event;
   try { event = await req.json(); }
   catch {
@@ -56,10 +64,16 @@ export default async function handler(req) {
     });
   }
 
-  // Derive fields
-  const growthChoice = pickAny([event, event?.payload],
+  const referer   = req.headers.get('referer')    || event.referer    || null;
+  const userAgent = req.headers.get('user-agent') || event.user_agent || null;
+
+  // Persist full event for debugging/analytics
+  const payload = event;
+
+  // Derive fields (from top-level or nested payload)
+  const growthChoice = pickAny([event, event.payload],
     [['inputs','growth'], ['growthChoice'], ['growth'], ['state','growth']]);
-  const tempChoice = pickAny([event, event?.payload],
+  const tempChoice = pickAny([event, event.payload],
     [['inputs','temp'], ['tempChoice'], ['temperature'], ['state','temp']]);
 
   let envCount = 0;
@@ -71,17 +85,18 @@ export default async function handler(req) {
     if (maybe != null) envCount = maybe;
   }
 
-  const total  = toInt(pickAny([event, event?.payload], [['total']]));
-  const crop   = pickAny([event, event?.payload], [['crop'], ['inputs','crop'], ['state','crop']]);
-  const weight = toNum(pickAny([event, event?.payload], [['weight'], ['inputs','weight']]));
+  // NEW: total / crop / weight columns
+  const total  = toInt(pickAny([event, event.payload], [['total']]));
+  const crop   = pickAny([event, event.payload], [['crop'], ['inputs','crop'], ['state','crop']]);
+  const weight = toNum(pickAny([event, event.payload], [['weight'], ['inputs','weight']]));
 
   try {
-    // NOTE: referer/user_agent/payload are NOT stored anymore
     await sql/*sql*/`
       INSERT INTO public.calc_events
-        (growth_choice, temp_choice, env_count, total, crop, weight)
+        (referer, user_agent, payload, growth_choice, temp_choice, env_count, total, crop, weight)
       VALUES
-        (${growthChoice}, ${tempChoice}, ${envCount}, ${total}, ${crop}, ${weight})
+        (${referer}, ${userAgent}, ${JSON.stringify(payload)}, ${growthChoice}, ${tempChoice}, ${envCount},
+         ${total}, ${crop}, ${weight})
     `;
     return new Response(JSON.stringify({ ok: true }), {
       status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders },
