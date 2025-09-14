@@ -1,115 +1,62 @@
-// filename: api/log-calc.js
-import { neon } from '@neondatabase/serverless';
+// api/log-calc.js
+import { sql, ensureCalcEventsTable } from '../lib/db.js';
 
-export const config = { runtime: 'edge' };
-const sql = neon(process.env.DATABASE_URL);
+const ALLOW_ORIGINS = [
+  // Add your domains here (production + preview). For quick start, we allow all:
+  '*'
+];
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
-function pickFrom(obj, path) {
-  try {
-    let cur = obj;
-    for (const k of path) {
-      if (!cur || typeof cur !== 'object' || !(k in cur)) return null;
-      cur = cur[k];
-    }
-    if (cur == null) return null;
-    return String(cur);
-  } catch { return null; }
+function cors(res) {
+  res.setHeader('Access-Control-Allow-Origin', ALLOW_ORIGINS.includes('*') ? '*' : ALLOW_ORIGINS.join(','));
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
-function pickAny(sources, paths) {
-  for (const src of sources) {
-    if (!src) continue;
-    for (const p of paths) {
-      const v = pickFrom(src, p);
-      if (v != null) return v;
-    }
-  }
-  return null;
-}
-const toInt = (n)=> {
-  const x = Number(n);
-  return Number.isFinite(x) ? Math.trunc(x) : null;
-};
-const toNum = (n)=> {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : null;
-};
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders });
-  }
+export default async function handler(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405, headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
-
-  // parse
-  let event;
-  try { event = await req.json(); }
-  catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-      status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
-  }
-
-  // sanitize payload for storage (UA/referer ko hata do agar aaye hon)
-  const payload = { ...(event || {}) };
-  delete payload.referer;
-  delete payload.user_agent;
-  if (payload.payload && typeof payload.payload === 'object') {
-    delete payload.payload.referer;
-    delete payload.payload.user_agent;
-  }
-  const payloadJSON = JSON.stringify(payload);
-
-  // derived fields
-  const growthChoice = pickAny([event, event?.payload],
-    [['inputs','growth'], ['growthChoice'], ['growth'], ['state','growth']]);
-  const tempChoice = pickAny([event, event?.payload],
-    [['inputs','temp'], ['tempChoice'], ['temperature'], ['state','temp']]);
-
-  let envCount = 0;
-  for (const arr of [event?.inputs?.env, event?.payload?.inputs?.env, event?.env, event?.payload?.env]) {
-    if (Array.isArray(arr)) { envCount = arr.length; break; }
-  }
-  if (!envCount) {
-    const maybe = toInt(event?.envCount ?? event?.payload?.envCount ?? event?.env_count ?? event?.payload?.env_count);
-    if (maybe != null) envCount = maybe;
-  }
-
-  // primary extraction
-  const total  = toInt(pickAny([event, event?.payload], [['total']]));
-  const crop   = pickAny([event, event?.payload], [['crop'], ['inputs','crop'], ['state','crop']]);
-  const weight = toNum(pickAny([event, event?.payload], [['weight'], ['inputs','weight']]));
 
   try {
-    // SQL fallback: if JS-side null, pull from payload JSON
-    await sql/*sql*/`
-      INSERT INTO public.calc_events
-        (payload, growth_choice, temp_choice, env_count, total, crop, weight)
+    await ensureCalcEventsTable();
+
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    // Basic fields we expect from frontend; 'payload' stores the full snapshot
+    const {
+      total,
+      crop,
+      qty,
+      weight,
+      friendPct,
+      maxMutation,
+      baseFloor,
+      growthBonus,
+      temperatureBonus,
+      envEntries,
+      payload
+    } = body;
+
+    const ua = req.headers['user-agent'] || null;
+    const referer = req.headers['referer'] || null;
+
+    await sql`
+      INSERT INTO calc_events (
+        total, crop, qty, weight, friend_pct, max_mutation, base_floor,
+        growth_bonus, temperature_bonus, env, ua, referer, payload
+      )
       VALUES (
-        ${payloadJSON}::jsonb,
-        ${growthChoice},
-        ${tempChoice},
-        ${envCount},
-        COALESCE(${total},  (${payloadJSON}::jsonb->>'total')::bigint),
-        COALESCE(${crop},   ${payloadJSON}::jsonb->>'crop'),
-        COALESCE(${weight}, (${payloadJSON}::jsonb->>'weight')::numeric)
+        ${total}, ${crop}, ${qty}, ${weight}, ${friendPct}, ${maxMutation}, ${baseFloor},
+        ${growthBonus}, ${temperatureBonus}, ${envEntries ? JSON.stringify(envEntries) : null},
+        ${ua}, ${referer}, ${payload ? JSON.stringify(payload) : null}
       )
     `;
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: 'DB insert failed', detail: String(e) }), {
-      status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('log-calc error', err);
+    return res.status(500).json({ ok: false, error: 'DB insert failed' });
   }
 }
