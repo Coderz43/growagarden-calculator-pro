@@ -549,3 +549,60 @@ function init(){
 }
 
 document.addEventListener('DOMContentLoaded', init);
+/* === Recent Records Loader (append-only) === */
+window.loadRecentRecords = async function loadRecentRecords() {
+  const table = document.getElementById("records-table");
+  if (!table) return; // only runs on records.html
+
+  const tbody = table.querySelector("tbody");
+  const refreshBtn = document.getElementById("refresh-btn");
+
+  // simple loading state
+  const setLoading = (on) => {
+    if (refreshBtn) refreshBtn.disabled = !!on;
+    tbody.innerHTML = on
+      ? `<tr><td colspan="7" class="muted">Loading latest records…</td></tr>`
+      : "";
+  };
+
+  try {
+    setLoading(true);
+    const res = await fetch("/api/get-records", { cache: "no-store" });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Fetch failed");
+
+    tbody.innerHTML = "";
+    json.data.forEach((row) => {
+      const tr = document.createElement("tr");
+      const created = new Date(row.created_at);
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td class="muted">${created.toLocaleString()}</td>
+        <td><span class="pill">${row.growth_choice ?? "-"}</span></td>
+        <td><span class="pill">${row.temp_choice ?? "-"}</span></td>
+        <td class="right">${Number(row.env_count ?? 0).toLocaleString()}</td>
+        <td class="right">${Number(row.total ?? 0).toLocaleString()}</td>
+        <td>${row.crop ?? "-"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (json.data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" class="muted">No records yet.</td></tr>`;
+    }
+  } catch (err) {
+    console.error("Error loading records:", err);
+    tbody.innerHTML = `<tr><td colspan="7" class="muted">Error: ${err.message}</td></tr>`;
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Auto-bind refresh button & initial load (only on records.html)
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("records-table")) {
+    window.loadRecentRecords();
+    const refreshBtn = document.getElementById("refresh-btn");
+    if (refreshBtn) refreshBtn.addEventListener("click", window.loadRecentRecords);
+  }
+});

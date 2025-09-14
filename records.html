@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recent Garden Calculations</title>
+
+  <!-- No edits to your existing CSS files; styling is encapsulated here -->
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --fg:#e5e7eb; --accent:#22c55e; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 32px;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,#0b1020, #0f172a 60%);
+      color: var(--fg);
+    }
+    .shell {
+      max-width: 1100px; margin: 0 auto;
+    }
+    header {
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+      margin-bottom: 18px;
+    }
+    h1 { font-size: 28px; margin: 0; letter-spacing: .2px; }
+    .sub { color: var(--muted); font-size: 14px; margin-top: 6px; }
+    .actions { display:flex; gap:10px; }
+    .btn {
+      border: 1px solid #1f2937; background: #0b1224; color: var(--fg);
+      padding: 10px 14px; border-radius: 10px; cursor: pointer; font-weight: 600;
+    }
+    .btn:hover { background:#0d152d; }
+    .card {
+      background: var(--card);
+      border: 1px solid #1f2937;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      overflow: hidden;
+    }
+    .table-wrap { overflow-x:auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--muted); background: #0b1224; border-bottom: 1px solid #1f2937;
+      padding: 12px 14px;
+    }
+    tbody td {
+      padding: 14px; border-bottom: 1px solid #1f2937; font-size: 14px;
+    }
+    tbody tr:hover { background: #0b1224; }
+    .pill {
+      display:inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px;
+      background: #0b1224; border: 1px solid #1f2937;
+    }
+    .ok { color: var(--accent); }
+    .muted { color: var(--muted); }
+    footer { margin-top: 14px; color: var(--muted); font-size: 12px; }
+    .right { text-align:right; }
+    .hide { display:none; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div>
+        <h1>🌱 Last 10 Garden Calculations</h1>
+        <div class="sub">Live snapshot of <span class="ok">public.calc_events</span> (read-only)</div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="refresh-btn">Refresh</button>
+        <a class="btn" href="./index.html">Back to Calculator</a>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table id="records-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Created At</th>
+              <th>Growth Choice</th>
+              <th>Temp Choice</th>
+              <th class="right">Env Count</th>
+              <th class="right">Total</th>
+              <th>Crop</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- populated by assets/js/app.js: loadRecentRecords() -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>
+      Tip: This view only reads the last 10 rows. To keep costs low, no polling is used—click “Refresh” to update.
+    </footer>
+  </div>
+
+  <!-- Your existing bundle (do not rename/move) -->
+  <script src="assets/js/app.js"></script>
+  <script>
+    // Kick once in case your app.js loads before DOMContentLoaded
+    window.loadRecentRecords && window.loadRecentRecords();
+  </script>
+</body>
+</html>
