@@ -12,8 +12,12 @@
       --fg: #111111;     /* body text */
       --bar: #000000;    /* top bar */
       --muted: #4b5563;  /* subtle text */
-      --btn: #0b1224;    /* button bg */
-      --btn-b: #111111;  /* button border */
+
+      /* Buttons: match navbar "Home" green chip */
+      --btn: #22c55e;             /* primary green */
+      --btn-hover: #1ea34f;       /* hover green */
+      --btn-border: #16a34a;      /* subtle border */
+
       --tbl-h: #f3f4f6;  /* table head background */
       --line: #000000;   /* table border lines -> BLACK */
     }
@@ -46,15 +50,17 @@
     .btn {
       background: var(--btn);
       color: #ffffff;
-      border: 1px solid var(--btn-b);
+      border: 1px solid var(--btn-border);
       padding: 10px 14px;
-      border-radius: 8px;
+      border-radius: 12px;
       cursor: pointer;
-      font-weight: 600;
+      font-weight: 700;
       text-decoration: none;
       display:inline-block;
+      transition: background .12s ease, transform .06s ease;
     }
-    .btn:hover { filter: brightness(1.08); }
+    .btn:hover { background: var(--btn-hover); }
+    .btn:active { transform: translateY(1px); }
 
     /* --- Content --- */
     .shell { max-width: 1100px; margin: 22px auto; padding: 0 24px; }
@@ -160,7 +166,7 @@
   <!-- Your existing bundle (unchanged path) -->
   <script src="assets/js/app.js"></script>
 
-  <!-- Fallback loader: runs even if app.js didn't define window.loadRecentRecords -->
+  <!-- Fallback loader (keeps table working even if app.js loader isn't available) -->
   <script>
     (function () {
       const run = async () => {
@@ -168,13 +174,11 @@
         if (!table) return;
         const tbody = table.querySelector('tbody');
 
-        // If app.js provided the loader, use it.
         if (window.loadRecentRecords) {
           window.loadRecentRecords();
           return;
         }
 
-        // Otherwise, do a safe, self-contained fetch + render here.
         tbody.innerHTML = `<tr><td colspan="7" class="muted">Loading latest records…</td></tr>`;
         try {
           const res = await fetch('/api/get-records', { cache: 'no-store' });
@@ -205,14 +209,12 @@
         }
       };
 
-      // Run after page paint
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', run);
       } else {
         run();
       }
 
-      // Hook up the Refresh button regardless of app.js
       document.addEventListener('click', (e) => {
         if (e.target && e.target.id === 'refresh-btn') run();
       });
@@ -220,5 +222,3 @@
   </script>
 </body>
 </html>
-
-
