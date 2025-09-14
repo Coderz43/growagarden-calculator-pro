@@ -5,79 +5,137 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Recent Garden Calculations</title>
 
-  <!-- Self-contained styles: dark gradient like home, crisp card, visible rows -->
   <style>
+    /* --- Base --- */
     :root {
-      --bg1:#0b1020; --bg2:#0f172a; --card:#0b1224; --line:#1f2937;
-      --fg:#e5e7eb; --muted:#94a3b8; --accent:#22c55e; --row:#0f1a33; --row2:#0d152b;
+      --bg: #ffffff;     /* page background */
+      --fg: #111111;     /* body text */
+      --bar: #000000;    /* top bar */
+      --muted: #4b5563;  /* subtle text */
+      --btn: #0b1224;    /* button bg */
+      --btn-b: #111111;  /* button border */
+      --tbl-h: #f3f4f6;  /* table head background */
+      --line: #000000;   /* table border lines -> BLACK */
     }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      color:var(--fg);
-      background: radial-gradient(1200px 600px at 10% -10%, #111b3a 0%, transparent 60%),
-                  linear-gradient(180deg,var(--bg1),var(--bg2) 60%, #0a1226);
-      padding:32px 16px;
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      line-height: 1.35;
     }
-    .shell{max-width:1200px; margin:0 auto;}
-    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;}
-    h1{margin:0; font-size:32px; letter-spacing:.2px;}
-    .sub{color:var(--muted); font-size:14px; margin-top:6px;}
-    .btn{
-      border:1px solid var(--line); background:var(--card); color:var(--fg);
-      padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; text-decoration:none; display:inline-block;
+
+    /* --- Top black bar --- */
+    .topbar {
+      background: var(--bar);
+      color: #ffffff;
+      padding: 18px 24px;
+      border-bottom: 2px solid var(--line);
     }
-    .btn:hover{filter:brightness(1.1)}
-    .card{
-      background:rgba(10,18,36,.8); backdrop-filter: blur(6px);
-      border:1px solid var(--line); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.35);
-      overflow:hidden;
+    .topbar .wrap {
+      max-width: 1100px; margin: 0 auto; display:flex; align-items:center; justify-content:space-between; gap:16px;
     }
-    .table-wrap{
-      max-height:65vh; /* scrollable area */
-      overflow:auto;
+    .title {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: .2px;
     }
-    table{width:100%; border-collapse:separate; border-spacing:0}
-    thead th{
-      position:sticky; top:0; z-index:1;
-      background:#0c1530; color:#cbd5e1;
-      border-bottom:1px solid var(--line);
-      text-align:left; font-size:12px; letter-spacing:.08em; text-transform:uppercase;
-      padding:14px;
+    .actions { display:flex; gap:10px; }
+    .btn {
+      background: var(--btn);
+      color: #ffffff;
+      border: 1px solid var(--btn-b);
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+      display:inline-block;
     }
-    tbody td{
-      padding:14px; border-bottom:1px solid #14203d; color:var(--fg); font-size:14px;
+    .btn:hover { filter: brightness(1.08); }
+
+    /* --- Content --- */
+    .shell { max-width: 1100px; margin: 22px auto; padding: 0 24px; }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+    /* --- Table Card --- */
+    .card {
+      background: #ffffff;
+      border: 2px solid var(--line);       /* outer border black */
+      border-radius: 10px;
+      overflow: hidden;
     }
-    tbody tr{background:var(--row)}
-    tbody tr:nth-child(even){background:var(--row2)}
-    tbody tr:hover{filter:brightness(1.1)}
-    .pill{
-      display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px;
-      background:#0b1224; border:1px solid var(--line);
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;            /* ensure single borders */
+      background: #ffffff;
     }
-    .right{text-align:right}
-    .muted{color:var(--muted)}
-    footer{margin-top:12px; color:var(--muted); font-size:12px}
-    .actions{display:flex; gap:10px}
+    thead th {
+      background: var(--tbl-h);
+      border-bottom: 2px solid var(--line); /* head bottom line black */
+      border-right: 1px solid var(--line);  /* vertical lines black */
+      padding: 12px 14px;
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #111111;
+    }
+    thead th:last-child { border-right: 0; }
+
+    tbody td {
+      padding: 14px;
+      border-bottom: 1px solid var(--line); /* row separators black */
+      border-right: 1px solid var(--line);  /* vertical lines black */
+      font-size: 14px;
+      color: #111111;
+      background: #ffffff;
+    }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody td:last-child { border-right: 0; }
+
+    .right { text-align: right; }
+    .muted { color: var(--muted); }
+
+    /* small pill tags but on white theme */
+    .pill {
+      display:inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #ffffff;
+      border: 1px solid var(--line);       /* pill border black */
+      color: #111111;
+    }
+
+    /* mobile tweaks */
+    @media (max-width: 640px) {
+      .title { font-size: 22px; }
+    }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <header>
-      <div>
-        <h1>🌱 Last 10 Garden Calculations</h1>
-        <div class="sub">Snapshot of <b>public.calc_events</b> (read-only)</div>
-      </div>
+
+  <!-- Top black header bar -->
+  <div class="topbar">
+    <div class="wrap">
+      <h1 class="title">🌱 Last 10 Garden Calculations</h1>
       <div class="actions">
         <button class="btn" id="refresh-btn">Refresh</button>
         <a class="btn" href="./index.html">Back to Calculator</a>
       </div>
-    </header>
+    </div>
+  </div>
 
+  <!-- Content -->
+  <div class="shell">
     <div class="card">
       <div class="table-wrap">
-        <table id="records-table" aria-label="Recent garden calculations">
+        <table id="records-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -90,19 +148,19 @@
             </tr>
           </thead>
           <tbody>
+            <!-- populated by assets/js/app.js: loadRecentRecords() -->
             <tr><td colspan="7" class="muted">Loading latest records…</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-
-    <footer>Tip: This page loads the last 10 rows. Click “Refresh” to update.</footer>
+    <div class="hint">Tip: This view reads only the last 10 rows. Click “Refresh” to update.</div>
   </div>
 
-  <!-- Keep your bundle path EXACTLY the same -->
+  <!-- Your existing bundle (unchanged path) -->
   <script src="assets/js/app.js"></script>
   <script>
-    // Trigger in case app.js loads first
+    // Trigger once in case app.js finishes before DOMContentLoaded
     window.loadRecentRecords && window.loadRecentRecords();
   </script>
 </body>
