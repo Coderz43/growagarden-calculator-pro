@@ -557,20 +557,23 @@ window.loadRecentRecords = async function loadRecentRecords() {
   const tbody = table.querySelector("tbody");
   const refreshBtn = document.getElementById("refresh-btn");
 
-  // simple loading state
+  // simple loading state — only set the message when starting
   const setLoading = (on) => {
     if (refreshBtn) refreshBtn.disabled = !!on;
-    tbody.innerHTML = on
-      ? `<tr><td colspan="7" class="muted">Loading latest records…</td></tr>`
-      : "";
+    if (on) {
+      tbody.innerHTML = `<tr><td colspan="7" class="muted">Loading latest records…</td></tr>`;
+    }
+    // IMPORTANT: do NOT clear tbody when on === false
   };
 
   try {
     setLoading(true);
+
     const res = await fetch("/api/get-records", { cache: "no-store" });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "Fetch failed");
 
+    // render rows
     tbody.innerHTML = "";
     json.data.forEach((row) => {
       const tr = document.createElement("tr");
@@ -594,7 +597,7 @@ window.loadRecentRecords = async function loadRecentRecords() {
     console.error("Error loading records:", err);
     tbody.innerHTML = `<tr><td colspan="7" class="muted">Error: ${err.message}</td></tr>`;
   } finally {
-    setLoading(false);
+    setLoading(false); // now harmless; doesn't clear rows
   }
 };
 
