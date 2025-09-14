@@ -5,58 +5,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Recent Garden Calculations</title>
 
-  <!-- No edits to your existing CSS files; styling is encapsulated here -->
+  <!-- Self-contained styles: dark gradient like home, crisp card, visible rows -->
   <style>
-    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --fg:#e5e7eb; --accent:#22c55e; }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; padding: 32px;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
-      background: linear-gradient(180deg,#0b1020, #0f172a 60%);
-      color: var(--fg);
+    :root {
+      --bg1:#0b1020; --bg2:#0f172a; --card:#0b1224; --line:#1f2937;
+      --fg:#e5e7eb; --muted:#94a3b8; --accent:#22c55e; --row:#0f1a33; --row2:#0d152b;
     }
-    .shell {
-      max-width: 1100px; margin: 0 auto;
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color:var(--fg);
+      background: radial-gradient(1200px 600px at 10% -10%, #111b3a 0%, transparent 60%),
+                  linear-gradient(180deg,var(--bg1),var(--bg2) 60%, #0a1226);
+      padding:32px 16px;
     }
-    header {
-      display:flex; align-items:center; justify-content:space-between; gap:16px;
-      margin-bottom: 18px;
+    .shell{max-width:1200px; margin:0 auto;}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;}
+    h1{margin:0; font-size:32px; letter-spacing:.2px;}
+    .sub{color:var(--muted); font-size:14px; margin-top:6px;}
+    .btn{
+      border:1px solid var(--line); background:var(--card); color:var(--fg);
+      padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; text-decoration:none; display:inline-block;
     }
-    h1 { font-size: 28px; margin: 0; letter-spacing: .2px; }
-    .sub { color: var(--muted); font-size: 14px; margin-top: 6px; }
-    .actions { display:flex; gap:10px; }
-    .btn {
-      border: 1px solid #1f2937; background: #0b1224; color: var(--fg);
-      padding: 10px 14px; border-radius: 10px; cursor: pointer; font-weight: 600;
+    .btn:hover{filter:brightness(1.1)}
+    .card{
+      background:rgba(10,18,36,.8); backdrop-filter: blur(6px);
+      border:1px solid var(--line); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.35);
+      overflow:hidden;
     }
-    .btn:hover { background:#0d152d; }
-    .card {
-      background: var(--card);
-      border: 1px solid #1f2937;
-      border-radius: 14px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.35);
-      overflow: hidden;
+    .table-wrap{
+      max-height:65vh; /* scrollable area */
+      overflow:auto;
     }
-    .table-wrap { overflow-x:auto; }
-    table { width: 100%; border-collapse: collapse; }
-    thead th {
-      text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
-      color: var(--muted); background: #0b1224; border-bottom: 1px solid #1f2937;
-      padding: 12px 14px;
+    table{width:100%; border-collapse:separate; border-spacing:0}
+    thead th{
+      position:sticky; top:0; z-index:1;
+      background:#0c1530; color:#cbd5e1;
+      border-bottom:1px solid var(--line);
+      text-align:left; font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+      padding:14px;
     }
-    tbody td {
-      padding: 14px; border-bottom: 1px solid #1f2937; font-size: 14px;
+    tbody td{
+      padding:14px; border-bottom:1px solid #14203d; color:var(--fg); font-size:14px;
     }
-    tbody tr:hover { background: #0b1224; }
-    .pill {
-      display:inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px;
-      background: #0b1224; border: 1px solid #1f2937;
+    tbody tr{background:var(--row)}
+    tbody tr:nth-child(even){background:var(--row2)}
+    tbody tr:hover{filter:brightness(1.1)}
+    .pill{
+      display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px;
+      background:#0b1224; border:1px solid var(--line);
     }
-    .ok { color: var(--accent); }
-    .muted { color: var(--muted); }
-    footer { margin-top: 14px; color: var(--muted); font-size: 12px; }
-    .right { text-align:right; }
-    .hide { display:none; }
+    .right{text-align:right}
+    .muted{color:var(--muted)}
+    footer{margin-top:12px; color:var(--muted); font-size:12px}
+    .actions{display:flex; gap:10px}
   </style>
 </head>
 <body>
@@ -64,6 +67,7 @@
     <header>
       <div>
         <h1>🌱 Last 10 Garden Calculations</h1>
+        <div class="sub">Snapshot of <b>public.calc_events</b> (read-only)</div>
       </div>
       <div class="actions">
         <button class="btn" id="refresh-btn">Refresh</button>
@@ -73,7 +77,7 @@
 
     <div class="card">
       <div class="table-wrap">
-        <table id="records-table">
+        <table id="records-table" aria-label="Recent garden calculations">
           <thead>
             <tr>
               <th>ID</th>
@@ -86,23 +90,20 @@
             </tr>
           </thead>
           <tbody>
-            <!-- populated by assets/js/app.js: loadRecentRecords() -->
+            <tr><td colspan="7" class="muted">Loading latest records…</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <footer>
-      Tip: This view only reads the last 10 rows. To keep costs low, no polling is used—click “Refresh” to update.
-    </footer>
+    <footer>Tip: This page loads the last 10 rows. Click “Refresh” to update.</footer>
   </div>
 
-  <!-- Your existing bundle (do not rename/move) -->
+  <!-- Keep your bundle path EXACTLY the same -->
   <script src="assets/js/app.js"></script>
   <script>
-    // Kick once in case your app.js loads before DOMContentLoaded
+    // Trigger in case app.js loads first
     window.loadRecentRecords && window.loadRecentRecords();
   </script>
 </body>
 </html>
-
