@@ -1,13 +1,13 @@
 // /api/get-records.js
 import { neon } from "@neondatabase/serverless";
 
-export const runtime = "edge"; // keep same style as your log route
+// ✅ Correct Vercel Edge signature
+export const config = { runtime: "edge" };
 
 export default async function handler(req) {
   try {
     const sql = neon(process.env.DATABASE_URL);
 
-    // Return the last 10 records; keep columns aligned with your table
     const rows = await sql`
       SELECT
         id,
