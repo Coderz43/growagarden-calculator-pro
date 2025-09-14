@@ -8,18 +8,20 @@
   <style>
     /* --- Base --- */
     :root {
-      --bg: #ffffff;     /* page background */
-      --fg: #111111;     /* body text */
-      --bar: #000000;    /* top bar */
-      --muted: #4b5563;  /* subtle text */
+      --bg: #ffffff;         /* page background */
+      --fg: #111111;         /* body text */
+      --bar: #000000;        /* top bar */
+      --muted: #4b5563;      /* subtle text */
 
-      /* Buttons: match navbar "Home" green chip */
-      --btn: #22c55e;             /* primary green */
-      --btn-hover: #1ea34f;       /* hover green */
-      --btn-border: #16a34a;      /* subtle border */
+      /* Buttons: dark by default, green on hover */
+      --btn-bg: #0b1224;           /* default (same as before) */
+      --btn-fg: #ffffff;
+      --btn-b: #111111;
+      --btn-hover: #22c55e;        /* green on hover */
+      --btn-hover-b: #16a34a;
 
-      --tbl-h: #f3f4f6;  /* table head background */
-      --line: #000000;   /* table border lines -> BLACK */
+      --tbl-h: #f3f4f6;      /* table head background */
+      --line: #000000;       /* table borders -> BLACK */
     }
     * { box-sizing: border-box; }
     html, body { margin:0; padding:0; }
@@ -40,26 +42,26 @@
     .topbar .wrap {
       max-width: 1100px; margin: 0 auto; display:flex; align-items:center; justify-content:space-between; gap:16px;
     }
-    .title {
-      margin: 0;
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: .2px;
-    }
+    .title { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: .2px; }
+
     .actions { display:flex; gap:10px; }
     .btn {
-      background: var(--btn);
-      color: #ffffff;
-      border: 1px solid var(--btn-border);
+      background: var(--btn-bg);
+      color: var(--btn-fg);
+      border: 1px solid var(--btn-b);
       padding: 10px 14px;
       border-radius: 12px;
       cursor: pointer;
       font-weight: 700;
       text-decoration: none;
       display:inline-block;
-      transition: background .12s ease, transform .06s ease;
+      transition: background .12s ease, border-color .12s ease, transform .06s ease, color .12s ease;
     }
-    .btn:hover { background: var(--btn-hover); }
+    .btn:hover {
+      background: var(--btn-hover);
+      border-color: var(--btn-hover-b);
+      color: #ffffff;
+    }
     .btn:active { transform: translateY(1px); }
 
     /* --- Content --- */
@@ -67,39 +69,21 @@
     .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
 
     /* --- Table Card --- */
-    .card {
-      background: #ffffff;
-      border: 2px solid var(--line);       /* outer border black */
-      border-radius: 10px;
-      overflow: hidden;
-    }
+    .card { background: #ffffff; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; }
     .table-wrap { overflow-x: auto; }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;            /* ensure single borders */
-      background: #ffffff;
-    }
+    table { width: 100%; border-collapse: collapse; background: #ffffff; }
     thead th {
       background: var(--tbl-h);
-      border-bottom: 2px solid var(--line); /* head bottom line black */
-      border-right: 1px solid var(--line);  /* vertical lines black */
-      padding: 12px 14px;
-      text-align: left;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: #111111;
+      border-bottom: 2px solid var(--line);
+      border-right: 1px solid var(--line);
+      padding: 12px 14px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #111111;
     }
     thead th:last-child { border-right: 0; }
 
     tbody td {
-      padding: 14px;
-      border-bottom: 1px solid var(--line); /* row separators black */
-      border-right: 1px solid var(--line);  /* vertical lines black */
-      font-size: 14px;
-      color: #111111;
-      background: #ffffff;
+      padding: 14px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);
+      font-size: 14px; color: #111111; background: #ffffff;
     }
     tbody tr:last-child td { border-bottom: 0; }
     tbody td:last-child { border-right: 0; }
@@ -107,21 +91,12 @@
     .right { text-align: right; }
     .muted { color: var(--muted); }
 
-    /* small pill tags but on white theme */
     .pill {
-      display:inline-block;
-      padding: 3px 8px;
-      border-radius: 999px;
-      font-size: 12px;
-      background: #ffffff;
-      border: 1px solid var(--line);       /* pill border black */
-      color: #111111;
+      display:inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px;
+      background: #ffffff; border: 1px solid var(--line); color: #111111;
     }
 
-    /* mobile tweaks */
-    @media (max-width: 640px) {
-      .title { font-size: 22px; }
-    }
+    @media (max-width: 640px) { .title { font-size: 22px; } }
   </style>
 </head>
 <body>
@@ -143,19 +118,18 @@
       <div class="table-wrap">
         <table id="records-table">
           <thead>
-            <tr>
-              <th>ID</th>
-              <th>Created At</th>
-              <th>Growth Choice</th>
-              <th>Temp Choice</th>
-              <th class="right">Env Count</th>
-              <th class="right">Total</th>
-              <th>Crop</th>
-            </tr>
+          <tr>
+            <th>ID</th>
+            <th>Created At</th>
+            <th>Growth Choice</th>
+            <th>Temp Choice</th>
+            <th class="right">Env Count</th>
+            <th class="right">Total</th>
+            <th>Crop</th>
+          </tr>
           </thead>
           <tbody>
-            <!-- populated by JS -->
-            <tr><td colspan="7" class="muted">Loading latest records…</td></tr>
+          <tr><td colspan="7" class="muted">Loading latest records…</td></tr>
           </tbody>
         </table>
       </div>
@@ -163,10 +137,10 @@
     <div class="hint">Tip: This view reads only the last 10 rows. Click “Refresh” to update.</div>
   </div>
 
-  <!-- Your existing bundle (unchanged path) -->
+  <!-- Your existing bundle -->
   <script src="assets/js/app.js"></script>
 
-  <!-- Fallback loader (keeps table working even if app.js loader isn't available) -->
+  <!-- Fallback loader -->
   <script>
     (function () {
       const run = async () => {
@@ -174,10 +148,7 @@
         if (!table) return;
         const tbody = table.querySelector('tbody');
 
-        if (window.loadRecentRecords) {
-          window.loadRecentRecords();
-          return;
-        }
+        if (window.loadRecentRecords) { window.loadRecentRecords(); return; }
 
         tbody.innerHTML = `<tr><td colspan="7" class="muted">Loading latest records…</td></tr>`;
         try {
@@ -208,16 +179,8 @@
           tbody.innerHTML = `<tr><td colspan="7" class="muted">Error: ${e.message}</td></tr>`;
         }
       };
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', run);
-      } else {
-        run();
-      }
-
-      document.addEventListener('click', (e) => {
-        if (e.target && e.target.id === 'refresh-btn') run();
-      });
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+      document.addEventListener('click', (e) => { if (e.target && e.target.id === 'refresh-btn') run(); });
     })();
   </script>
 </body>
